@@ -48,11 +48,9 @@ if __name__ == '__main__':
     systems_cleaned['first_timestamp']\
         = systems_cleaned['first_timestamp'].astype('datetime64[s]')
     # add the new columns
-    systems_cleaned.loc[:, 'has_power_data']\
+    systems_cleaned.loc[:, 'has_voltage_data']\
         = pd.Series([False]*num_sources, dtype='boolean')
-    systems_cleaned.loc[:, 'has_ambient_temp_data']\
-        = pd.Series([False]*num_sources, dtype='boolean')
-    systems_cleaned.loc[:, 'has_some_temp_data']\
+    systems_cleaned.loc[:, 'has_current_data']\
         = pd.Series([False]*num_sources, dtype='boolean')
     systems_id_set = set(systems_cleaned['system_id'].unique())
     print("Proceeding to load data from prize data.")
@@ -71,46 +69,34 @@ if __name__ == '__main__':
                 systems_cleaned.loc[:, 'system_id'] == system_id
             ]
             for ind in relevant_rows.index:
+                # improvement
                 for key in system_metrics.keys():
-                    if search_for_fragment_dict(system_metrics, key, 'pow'):
-                        systems_cleaned.loc[ind, 'has_power_data'] = True
-                    if search_for_fragment_dict(system_metrics, key, 'mbient'):
-                        systems_cleaned.loc[ind,
-                                            'has_ambient_temp_data'] = True
-                    if search_for_fragment_dict(system_metrics, key, 'temp'):
-                        systems_cleaned.loc[ind,
-                                            'has_some_temp_data'] = True
-
+                    if search_for_fragment_dict(system_metrics, key, 'volt'):
+                        systems_cleaned.loc[ind, 'has_voltage_data'] = True
+                    if search_for_fragment_dict(system_metrics, key, 'curr'):
+                        systems_cleaned.loc[ind, 'has_current_data'] = True
     print("Proceeding to load data from parquet data.")
     metrics_dir = Path("../../data/raw/parquet-metrics/")
     metrics_pq = pq.ParquetDataset(metrics_dir)
     metrics_df = metrics_pq.read().to_pandas()
     parquet_metrics_set = set(metrics_df['system_id'].unique())
     # We first look for power
-    metrics_with_pow = search_for_fragment_df(metrics_df, 'pow')
-    parquet_pow_set = set(metrics_with_pow['system_id'].unique())
-    for system_id in parquet_pow_set.intersection(systems_id_set):
+    metrics_with_volt = search_for_fragment_df(metrics_df, 'volt')
+    parquet_volt_set = set(metrics_with_volt['system_id'].unique())
+    for system_id in parquet_volt_set.intersection(systems_id_set):
         sys_relevant_rows = systems_cleaned.loc[
             systems_cleaned.loc[:, 'system_id'] == system_id
         ]
         for ind in sys_relevant_rows.index:
-            systems_cleaned.loc[ind, 'has_power_data'] = True
-    metrics_with_ambient = search_for_fragment_df(metrics_df, 'ambient')
-    parquet_amb_set = set(metrics_with_ambient['system_id'].unique())
-    for system_id in parquet_amb_set.intersection(systems_id_set):
+            systems_cleaned.loc[ind, 'has_voltage_data'] = True
+    metrics_with_curr = search_for_fragment_df(metrics_df, 'curr')
+    parquet_curr_set = set(metrics_with_curr['system_id'].unique())
+    for system_id in parquet_curr_set.intersection(systems_id_set):
         sys_relevant_rows = systems_cleaned.loc[
             systems_cleaned.loc[:, 'system_id'] == system_id
         ]
         for ind in sys_relevant_rows.index:
-            systems_cleaned.loc[ind, 'has_ambient_temp_data'] = True
-    metrics_with_temp = search_for_fragment_df(metrics_df, 'temp')
-    parquet_temp_set = set(metrics_with_temp['system_id'].unique())
-    for system_id in parquet_temp_set.intersection(systems_id_set):
-        sys_relevant_rows = systems_cleaned.loc[
-            systems_cleaned.loc[:, 'system_id'] == system_id
-        ]
-        for ind in sys_relevant_rows.index:
-            systems_cleaned.loc[ind, 'has_some_temp_data'] = True
+            systems_cleaned.loc[ind, 'has_current_data'] = True
     print("Proceeding to load metadata from csv data.")
     # We begin by downloading metadata.
     csv_metadata_dir = Path('../../data/raw/csv-metadata/')
@@ -138,23 +124,14 @@ if __name__ == '__main__':
                 if has_metrics:
                     for key in system_metrics.keys():
                         if search_for_fragment_dict(
-                            system_metrics, key, 'pow'
+                            system_metrics, key, 'volt'
                         ):
-                            systems_cleaned.loc[ind, 'has_power_data'] = True
+                            systems_cleaned.loc[ind, 'has_voltage_data'] = True
                         if search_for_fragment_dict(
-                            system_metrics, key, 'mbient'
+                            system_metrics, key, 'curr'
                         ):
-                            systems_cleaned.loc[ind,
-                                                'has_ambient_temp_data'] = True
-                        if search_for_fragment_dict(
-                            system_metrics, key, 'temp'
-                        ):
-                            systems_cleaned.loc[ind,
-                                                'has_some_temp_data'] = True
-                else:
-                    # default statistics include power, nothing else
-                    systems_cleaned.loc[ind, 'has_power_data'] = True
-
+                            systems_cleaned.loc[ind, 'has_voltage_data'] = True
+                # default data has neither of these!
     # save and quit!
     systems_cleaned.to_csv(permanent_systems_cleaned_path,
                            index=False)
