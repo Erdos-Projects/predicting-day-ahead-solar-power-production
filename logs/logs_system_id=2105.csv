@@ -1,3 +1,8 @@
 ..\..\data\raw\systems\prize\2105\2105_inv01_data.csv,pvdaq/2023-solar-data-prize/2105_OEDI/data/2105_inv01_data.csv,1771447040.6646748
 ..\..\data\raw\systems\prize\2105\2105_meter_data.csv,pvdaq/2023-solar-data-prize/2105_OEDI/data/2105_meter_data.csv,1771447058.8854997
 ..\..\data\raw\systems\prize\2107\2107_electrical_data_v1.csv,pvdaq/2023-solar-data-prize/2107_OEDI/data/2107_electrical_data_v1.csv,1771447122.8113365
+..\..\..\data_ds_project\systems\prize\2105\2105_environment_1_data.csv,pvdaq/2023-solar-data-prize/2105_OEDI/data/2105_environment_1_data.csv,1771883673.5938184
+..\..\..\data_ds_project\systems\prize\2105\2105_environment_2_data.csv,pvdaq/2023-solar-data-prize/2105_OEDI/data/2105_environment_2_data.csv,1771883674.5732608
+..\..\..\data_ds_project\systems\prize\2105\2105_irradiance_data.csv,pvdaq/2023-solar-data-prize/2105_OEDI/data/2105_irradiance_data.csv,1771883675.420271
+..\..\..\data_ds_project\systems\prize\2105\2105_inv01_data.csv,pvdaq/2023-solar-data-prize/2105_OEDI/data/2105_inv01_data.csv,1771883790.8209634
+..\..\..\data_ds_project\systems\prize\2105\2105_meter_data.csv,pvdaq/2023-solar-data-prize/2105_OEDI/data/2105_meter_data.csv,1771883854.3022492

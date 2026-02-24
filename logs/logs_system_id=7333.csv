@@ -6,3 +6,11 @@
 ..\..\data\raw\systems\prize\7333\7333_5_min_ac_20210101_20211231.csv,pvdaq/2023-solar-data-prize/7333_5_min_OEDI/data/7333_5_min_ac_20210101_20211231.csv,1771447531.5416932
 ..\..\data\raw\systems\prize\7333\7333_5_min_ac_20220101_20221231.csv,pvdaq/2023-solar-data-prize/7333_5_min_OEDI/data/7333_5_min_ac_20220101_20221231.csv,1771447555.2161524
 ..\..\data\raw\systems\prize\7333\7333_5_min_ac_20230101_20231231.csv,pvdaq/2023-solar-data-prize/7333_5_min_OEDI/data/7333_5_min_ac_20230101_20231231.csv,1771447579.4919908
+..\..\..\data_ds_project\systems\prize\7333\7333_5_min_powerfactor_20160101_20161231.csv,pvdaq/2023-solar-data-prize/7333_5_min_OEDI/data/7333_5_min_powerfactor_20160101_20161231.csv,1771883999.8968692
+..\..\..\data_ds_project\systems\prize\7333\7333_5_min_powerfactor_20170101_20171231.csv,pvdaq/2023-solar-data-prize/7333_5_min_OEDI/data/7333_5_min_powerfactor_20170101_20171231.csv,1771884001.00961
+..\..\..\data_ds_project\systems\prize\7333\7333_5_min_powerfactor_20180101_20181231.csv,pvdaq/2023-solar-data-prize/7333_5_min_OEDI/data/7333_5_min_powerfactor_20180101_20181231.csv,1771884003.8218706
+..\..\..\data_ds_project\systems\prize\7333\7333_5_min_powerfactor_20190101_20191231.csv,pvdaq/2023-solar-data-prize/7333_5_min_OEDI/data/7333_5_min_powerfactor_20190101_20191231.csv,1771884007.633384
+..\..\..\data_ds_project\systems\prize\7333\7333_5_min_powerfactor_20200101_20201231.csv,pvdaq/2023-solar-data-prize/7333_5_min_OEDI/data/7333_5_min_powerfactor_20200101_20201231.csv,1771884010.561062
+..\..\..\data_ds_project\systems\prize\7333\7333_5_min_powerfactor_20210101_20211231.csv,pvdaq/2023-solar-data-prize/7333_5_min_OEDI/data/7333_5_min_powerfactor_20210101_20211231.csv,1771884013.622839
+..\..\..\data_ds_project\systems\prize\7333\7333_5_min_powerfactor_20220101_20221231.csv,pvdaq/2023-solar-data-prize/7333_5_min_OEDI/data/7333_5_min_powerfactor_20220101_20221231.csv,1771884016.5901513
+..\..\..\data_ds_project\systems\prize\7333\7333_5_min_powerfactor_20230101_20231231.csv,pvdaq/2023-solar-data-prize/7333_5_min_OEDI/data/7333_5_min_powerfactor_20230101_20231231.csv,1771884020.6471405

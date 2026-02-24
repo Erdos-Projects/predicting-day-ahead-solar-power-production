@@ -19,14 +19,11 @@ systems_namelist = ['2105', '2107', '7333_5_min', '9068', '9069']
 for j in range(5):
     system_id = systems_shortlist[j]
     system_name = systems_namelist[j]
-    local_file_dir = f'../../data/raw/systems/prize/{system_id}/'
+    local_file_dir = f'../../../data_ds_project/systems/prize/{system_id}/'
     file_prefix_e = "pvdaq/2023-solar-data-prize/"\
         + f"{system_name}_OEDI/data/"\
         + f"{system_name}_environment"
     file_prefix_i = "pvdaq/2023-solar-data-prize/"\
-        + f"{system_name}_OEDI/data/"\
-        + f"{system_name}_irradiance"
-    file_prefix_p = "pvdaq/2023-solar-data-prize/"\
         + f"{system_name}_OEDI/data/"\
         + f"{system_name}_irradiance"
     downloader(
@@ -34,13 +31,13 @@ for j in range(5):
         file_prefix_e,
         warn_empty=True,
         log_path=f'../../logs/logs_system_id={system_id}.csv',
-        data_directory_description=f'Parquet Data for System {system_id}'
+        data_directory_description=f'Prize Data for System {system_id}'
     )
     downloader(
         local_file_dir,
         file_prefix_i,
         warn_empty=True,
         log_path=f'../../logs/logs_system_id={system_id}.csv',
-        data_directory_description=f'Parquet Data for System {system_id}'
+        data_directory_description=f'Prize Data for System {system_id}'
     )
     # other data groups much more space-intensive, will adjust as necessary.
