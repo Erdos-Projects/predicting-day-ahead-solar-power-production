@@ -40,7 +40,7 @@ python3 all_parquet_downloader.py
 7. Use `code all_parquet_downloader.py` to open the file, edit the starting and ending indices, save and quit.
 8. Run the Python file again.
 9. Repeat steps 7-8 until done.
-10. Since the program will never repeat steps, you can do one last run with all the indices (0-155) to make sure you do not
+10. Since the program will never repeat steps, you can do one last run with all the indices (0-155) to make sure you did not miss anything.
 
 ## Next Steps
 1.  You can now use `practice_parquet_reader.ipynb` to explore each of the files, so long as you adjust the `system_id` for your system and `access_system_dir` accordingly.
