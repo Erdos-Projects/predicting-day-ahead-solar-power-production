@@ -3,7 +3,8 @@ pandas
 seaborn
 matplotlib
 pyarrow.parquet
-pdvaq_access
+boto3
+botocore
 RdTools
 pvlib
 pvdeg
