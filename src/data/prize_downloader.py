@@ -3,14 +3,14 @@
 
 import boto3
 from botocore.handlers import disable_signing
-from systems_initializer import downloader
+from all_parquet_downloader import downloader_mk_2
 
 s3 = boto3.resource("s3")
 s3.meta.client.meta.events.register("choose-signer.s3.*", disable_signing)
 bucket = s3.Bucket("oedi-data-lake")
 
-
 # choices -- configure per run
+add_logs = False
 
 # found by direct inspection on website
 systems_shortlist = [2105, 2107, 7333, 9068, 9069]
@@ -26,17 +26,19 @@ for j in range(5):
     file_prefix_i = "pvdaq/2023-solar-data-prize/"\
         + f"{system_name}_OEDI/data/"\
         + f"{system_name}_irradiance"
-    downloader(
+    downloader_mk_2(
         local_file_dir,
         file_prefix_e,
         warn_empty=True,
+        make_logs=add_logs,
         log_path=f'../../logs/logs_system_id={system_id}.csv',
         data_directory_description=f'Prize Data for System {system_id}'
     )
-    downloader(
+    downloader_mk_2(
         local_file_dir,
         file_prefix_i,
         warn_empty=True,
+        make_logs=add_logs,
         log_path=f'../../logs/logs_system_id={system_id}.csv',
         data_directory_description=f'Prize Data for System {system_id}'
     )
