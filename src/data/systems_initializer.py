@@ -1,15 +1,12 @@
-'''Download the main metadata source,
-clean up the metadata a little bit,
-and determine which solar installations are
-(likely to) have useful data.'''
+'''Clean up the metadata a little bit,
+and do some preliminary checks as to which data
+has the most information.'''
 
 import pandas as pd
 import pyarrow.parquet as pq
 from pathlib import Path
-import os
 import boto3
 from botocore.handlers import disable_signing
-import time
 import datetime
 import json
 
@@ -20,142 +17,45 @@ s3 = boto3.resource("s3")
 s3.meta.client.meta.events.register("choose-signer.s3.*", disable_signing)
 bucket = s3.Bucket("oedi-data-lake")
 
+metric_names_and_fragments = {
+    'irradiance': 'irrad',
+    'ambient_temperature': 'mbient',
+    'temperature': 'temp',
+    'power': 'pow',
+    'current': 'curr',
+    'voltage': 'volt',
+    'ac': 'ac',
+    'dc': 'dc'
+}
 
-def downloader(path_to_dir_local: str, path_to_dir_online: str,
-               warn_empty=False, is_specific_file_type=False,
-               specific_file_type='',
-               log_path='../../logs/logs.csv',
-               data_directory_description=''):
-    '''Download a file or collection of files from the
-    OEDI PVDAQ Data Lake.
-    More granular control than the pvdaq_access package,
-    and included some logging.
 
-    Parameters
-    ------------
-    path_to_dir_local: str
-        A string representing the desired path to the file storage
-        on the local system.  Must be a valid directory [end in / or \\]
-    path_to_dir_online: str
-        A string directing the prefix of the filenames of the files
-        to access online.
-        Despite the name, this does not need to be a directory.
-    warn_empty: bool
-        Print if there are no items to download.
-    is_specific_file_type: bool
-        Print if you want to restrict to a particular file_type
-    specific_file_type: str
-        The specific file type you want.
-    log_path: str
-        The path to the log file you want.
-    data_directory_description: str
-        The describing text you want in the data file.
-    '''
-    global bucket
-    downloads_list = []
-    if path_to_dir_local[-1] != '/' and path_to_dir_local[-1] != '\\':
-        raise ValueError('Local path does not end in "/" or "\\",'
-                         + ' and hence is not a possible directory!')
-    my_local_dir = Path(path_to_dir_local)
-    if not my_local_dir.is_dir():
-        my_local_dir.mkdir()
-    objects = bucket.objects.filter(
-        Prefix=path_to_dir_online
-    )
-    # sometimes objects goofs and gives a no-continuation prefix
-    # to the online directory/filepath
-    # in addition to the other objects, so some workarounds
-    # are necessary.
-    if len(list(objects)) == 0:
-        if warn_empty:
-            print('No such files!')
-        return False
-    else:
-        for obj in objects:
-            # horrible mix of os.path and pathlib.Path, but it works
-            file_path = Path(
-                os.path.join(
-                    my_local_dir, os.path.basename(obj.key)
-                )
-            )
-            # Sometimes filter messes up and just gives us a directory back.
-            # if it's the same as the starting directory, ok,
-            # harmless error, skip it
-            # if it's not the same as the starting directory, flag it.
-            if file_path.is_dir():
-                if file_path != my_local_dir:
-                    print(file_path)
-                    raise ValueError('Somehow we got a new directory back!')
-            elif not file_path.is_file():  # time to download!
-                # check for file type if asked
-                suffix_len = len(specific_file_type)
-                type_valid = False
-                if not is_specific_file_type:
-                    type_valid = True
-                elif f'{obj.key}'[-suffix_len:] == specific_file_type:
-                    type_valid = True
-                if type_valid:
-                    download_time = time.time()
-                    bucket.download_file(
-                        obj.key, file_path
-                    )
-                    sources_download = {
-                        "Filename": str(file_path),
-                        "Source": str(obj.key),
-                        "Access Time": download_time
-                    }
-                    downloads_list.append(sources_download)
-        if len(downloads_list) > 0:
-            # save download logs
-            log_path = Path(log_path)
-            try:
-                with open(log_path, mode='a') as log_adder:
-                    log_adder.writelines(
-                        [f'{inst["Filename"]},'
-                         + f'{inst["Source"]},'
-                         + f'{inst["Access Time"]}\n'
-                         for inst in downloads_list]
-                    )
-            except FileNotFoundError:
-                log_path.touch()
-                with open(log_path, mode='w') as log_adder:
-                    log_adder.writelines(
-                        [f'{inst["Filename"]},'
-                         + f'{inst["Source"]},'
-                         + f'{inst["Access Time"]}\n'
-                         for inst in downloads_list]
-                    )
-            except BaseException as e:
-                raise e
+def metric_col_name(metric_name: str):
+    return f'has_{metric_name}_data'
 
-            # append new notes to data_inventory.csv
-            data_inventory_path = '../../data_inventory.csv'
-            try:
-                with open(data_inventory_path, 'a') as data_adder:
-                    data_adder.writelines(
-                        [f'{inst["Filename"]},'
-                         + data_directory_description + '\n'
-                         for inst in downloads_list]
-                    )
-            except FileNotFoundError:
-                data_inventory_path.touch()
-                with open(log_path, mode='w') as data_adder:
-                    data_adder.writelines(
-                        [f'Filename: {inst["Filename"]},'
-                         + data_directory_description + '\n'
-                         for inst in downloads_list]
-                    )
-            except BaseException as e:
-                raise e
+
+def metrics_search_for_fragment_df(df: pd.DataFrame, fragment: str):
+    fragment = fragment.lower()
+    return df[
+        (df.loc[:, 'sensor_name'].str.contains(fragment, case=False))
+        | (df.loc[:, 'common_name'].str.contains(fragment, case=False))
+    ]
+
+
+def metrics_search_for_fragment_dict(the_dict, key, fragment: str):
+    fragment = fragment.lower()
+    if fragment in key.lower():
         return True
+    # go to the next level
+    this_metric = the_dict[key]
+    this_metric_sensor = this_metric['sensor_name'].lower()
+    this_metric_common = this_metric['common_name'].lower()
+    if fragment in this_metric_sensor or fragment in this_metric_common:
+        return True
+    else:
+        return False
 
 
 if __name__ == '__main__':
-    # download the sources_file
-    downloader(
-        '../../data/raw/',
-        'pvdaq/csv/systems_20250729.csv'
-    )
     # load sources
     systems_cleaned = pd.read_csv('../../data/raw/systems_20250729.csv')
     # drop some empty unnamed columns [coming from extra commas in the csv]
@@ -166,9 +66,12 @@ if __name__ == '__main__':
     systems_cleaned = systems_cleaned.drop(
         columns=unnamed_columns
     )
-    # put starting date as date type
+    # put starting/ending dates as datetime type
     systems_cleaned['first_timestamp'] = pd.to_datetime(
         systems_cleaned['first_timestamp'], format='%m/%d/%Y %H:%M'
+    ).astype('datetime64[s]')
+    systems_cleaned['last_timestamp'] = pd.to_datetime(
+        systems_cleaned['last_timestamp'], format='%m/%d/%Y %H:%M'
     ).astype('datetime64[s]')
     systems_cleaned.loc[:, 'first_year']\
         = systems_cleaned['first_timestamp'].dt.year
@@ -179,19 +82,16 @@ if __name__ == '__main__':
         = pd.Series([False]*num_sources, dtype='boolean')
     systems_cleaned.loc[:, 'is_lake_csv_data']\
         = pd.Series([False]*num_sources, dtype='boolean')
-    systems_cleaned.loc[:, 'has_irrad_data']\
-        = pd.Series([False]*num_sources, dtype='boolean')
+    for metric in metric_names_and_fragments.keys():
+        col_name = metric_col_name(metric)
+        systems_cleaned[col_name]\
+            = pd.Series([False]*num_sources, dtype='boolean')
     systems_id_set = set(systems_cleaned['system_id'].unique())
-    print("Proceeding to load data from prize data.")
+    print("Proceeding to load metadata from prize data.")
     # by manual inspection, there are 5 sites in the prize data,
     prize_system_ids = [2105, 2107, 7333, 9068, 9069]
     for system_id in prize_system_ids:
-        # download the metadata
-        downloader(
-            '../../data/raw/prize-metadata/',
-            f'pvdaq/2023-solar-data-prize/{system_id}_OEDI/metadata/'
-        )
-        # load the data
+        # load the metadata
         metadata_filepath = Path(
                 '../../data/raw/prize-metadata/'
                 + f'{system_id}_system_metadata.json'
@@ -199,48 +99,31 @@ if __name__ == '__main__':
         with open(metadata_filepath) as json_reader:
             local_metadata = json.load(json_reader)
             system_metrics = local_metadata['Metrics']
-            # for reasons to get into later, we override the 'first_year' line
+            # for reasons to get into later, we override the 'first_year'
             first_timestamp = local_metadata['System']['first_timestamp']
             first_year = datetime.datetime.strptime(
                 first_timestamp, "%Y-%m-%d %H:%M:%S"
             ).year
+
             # assign the data to the chart.
             relevant_rows = systems_cleaned.loc[
                 systems_cleaned.loc[:, 'system_id'] == system_id
             ]
             for ind in relevant_rows.index:
                 systems_cleaned.loc[ind, 'is_prize_data'] = True
-                for key in system_metrics.keys():
-                    # Avoid Irrad vs. irrad as follows.
-                    if 'rrad' in key:
-                        systems_cleaned.loc[ind, 'has_irrad_data'] = True
-                        break
-    # Note that the metadata files include both "started_on"
-    # and "first_timestamp" properties;
-    # we manually checked that first_timestamp is more accurate.
-    # lastly, we note that 7333 is a really-fast-reporting location,
-    # and has downsampled its data in a different folder.
-    # We grab the metadata for reference
-    downloader(
-        '../../data/raw/prize-metadata/',
-        'pvdaq/2023-solar-data-prize/7333_5_min_OEDI/metadata/',
-        warn_empty=True
-    )
+                systems_cleaned.loc[ind, 'first_year'] = first_year
+                # check for metrics
+                for metric, fragment in metric_names_and_fragments.items():
+                    for key in system_metrics.keys():
+                        if metrics_search_for_fragment_dict(
+                            system_metrics, key, fragment
+                        ):
+                            systems_cleaned.loc[
+                                ind, f'has_{metric}_data'
+                            ] = True
+                            break
 
-    print("Proceeding to load data from parquet data.")
-    # We begin by downloading metadata.
-    downloader(
-        "../../data/raw/parquet-metrics/",
-        "pvdaq/parquet/metrics/"
-    )
-    downloader(
-        "../../data/raw/parquet-sites/",
-        "pvdaq/parquet/site/"
-    )
-    downloader(
-        "../../data/raw/parquet-systems/",
-        "pvdaq/parquet/system/"
-    )
+    print("Proceeding to load metadata from parquet data.")
     metrics_dir = Path("../../data/raw/parquet-metrics/")
     metrics_pq = pq.ParquetDataset(metrics_dir)
     metrics_df = metrics_pq.read().to_pandas()
@@ -271,75 +154,57 @@ if __name__ == '__main__':
     # Also, it is in Golden, CO where many other solar facilities are.
     # So, it can be ignored!
 
-    # We first populate the 'is_lake_parquet_data' flag
     for system_id in parquet_metrics_set.intersection(systems_id_set):
         # first, can definitely flag the 'is_lake_parquet_data' flag
-        sys_relevant_rows = systems_cleaned.loc[
+        relevant_rows = systems_cleaned.loc[
             systems_cleaned.loc[:, 'system_id'] == system_id
         ]
-        for ind in sys_relevant_rows.index:
+        for ind in relevant_rows.index:
             systems_cleaned.loc[ind, 'is_lake_parquet_data'] = True
-
-    # We continue by filtering out the systems that do not collect
-    # irradiance data.
-    # Just look for a common name with 'rrad'
-    # to avoid testing capital vs. lowercase i.
-    metrics_with_irrad = metrics_df.loc[
-        metrics_df.loc[:, 'common_name'].str.contains('rrad')
-    ]
-    parquet_metrics_irrad_set = set(metrics_with_irrad['system_id'].unique())
-    # now we check for having enough data
-    for system_id in parquet_metrics_irrad_set.intersection(systems_id_set):
-        # first, can definitely flag the 'has_irrad_data' flag
-        sys_relevant_rows = systems_cleaned.loc[
-            systems_cleaned.loc[:, 'system_id'] == system_id
-        ]
-        for ind in sys_relevant_rows.index:
-            systems_cleaned.loc[ind, 'has_irrad_data'] = True
-        # it was an unpleasant surprise to learn for the parquet data
-        # that the first year was calculated incorrectly.
-        # (see systems 1283, 1284, 1289)
-        # Our simple strategy is to start with the hinted year
-        # and increment until we actually have a good starting year.
-        first_ind = sys_relevant_rows.index[0]
-        first_year = int(sys_relevant_rows.loc[first_ind, 'first_year'])
-        good_first_year = False
-        while not good_first_year:
-            prefix = "pvdaq/parquet/pvdata/"\
-                + f"system_id={system_id}/year={first_year}"
-            # recall the s3 Bucket object, bucket
-            # our access point to the data set.
-            objects = bucket.objects.filter(
-                Prefix=prefix
-            )
-            if (objects is None) or (len(list(objects)) == 0):
-                first_year += 1
-                if first_year >= 2024:
-                    print(system_id)
-                    print('Breaking to avoid infinite loop,'
-                          + 'but not enough data.')
+            # Correcting first year: it was an unpleasant surprise to learn
+            # that the first year from systems_20250729.csv
+            # was calculated incorrectly for some parquet-data systems
+            # (see systems 1283, 1284, 1289)
+            # Our simple strategy is to start with the hinted year
+            # and increment until we actually have a good starting year.
+            first_ind = relevant_rows.index[0]
+            first_year = int(relevant_rows.loc[first_ind, 'first_year'])
+            good_first_year = False
+            while not good_first_year:
+                prefix = "pvdaq/parquet/pvdata/"\
+                    + f"system_id={system_id}/year={first_year}"
+                # recall the s3 Bucket object, bucket
+                # our access point to the data set.
+                objects = bucket.objects.filter(
+                    Prefix=prefix
+                )
+                if (objects is None) or (len(list(objects)) == 0):
+                    first_year += 1
+                    if first_year >= 2024:
+                        print(system_id)
+                        print('Breaking to avoid infinite loop, '
+                              + 'but not enough data.')
+                        good_first_year = True
+                else:
                     good_first_year = True
-            else:
-                good_first_year = True
-        # correct the first year
-        sys_relevant_rows.loc[first_ind, 'first_year'] = first_year
+            # correct the first year
+            relevant_rows.loc[first_ind, 'first_year'] = first_year
+
+    # now fill in metrics search
+    for metric, fragment in metric_names_and_fragments.items():
+        col_name = metric_col_name(metric)
+        collect_my_metric = metrics_search_for_fragment_df(
+            metrics_df, fragment
+        )
+        good_metric_ids = set(collect_my_metric['system_id'].unique())
+        for system_id in good_metric_ids.intersection(systems_id_set):
+            relevant_rows = systems_cleaned.loc[
+                systems_cleaned.loc[:, 'system_id'] == system_id
+            ]
+            for ind in relevant_rows.index:
+                systems_cleaned.loc[ind, col_name] = True
 
     print("Proceeding to load metadata from csv data.")
-    # We begin by downloading metadata.
-    downloader(
-        "../../data/raw/csv-metadata/",
-        "pvdaq/csv/system_metadata/",
-        warn_empty=False,
-        is_specific_file_type=True,
-        specific_file_type='.json'
-    )
-    downloader(
-        "../../data/raw/csv-metadata/",
-        "pvdaq/csv/system_metadata/",
-        warn_empty=False,
-        is_specific_file_type=True,
-        specific_file_type='.pdf'
-    )
     csv_metadata_dir = Path('../../data/raw/csv-metadata/')
     # now grab the json files, infer the system_id, and
     # check for metadata
@@ -368,15 +233,40 @@ if __name__ == '__main__':
             ]
             for ind in relevant_rows.index:
                 systems_cleaned.loc[ind, 'is_lake_csv_data'] = True
-                if has_metrics:
-                    for key in system_metrics.keys():
-                        # Avoid Irrad vs. irrad as follows.
-                        if 'rrad' in key:
-                            systems_cleaned.loc[ind, 'has_irrad_data'] = True
-                            break
-                # otherwise, "standard" outputs do not contain irradiance,
-                # so do nothing.
                 systems_cleaned.loc[ind, 'first_year'] = first_year
+                if has_metrics:
+                    for metric, fragment in metric_names_and_fragments.items():
+                        for key in system_metrics.keys():
+                            if metrics_search_for_fragment_dict(
+                                system_metrics, key, fragment
+                            ):
+                                col_name = metric_col_name(metric)
+                                systems_cleaned.loc[ind, col_name] = True
+                                break
+                else:
+                    # by observation, standard outputs have ac_power
+                    # and ac_energy as daily averages,
+                    # and nothing else
+                    systems_cleaned.loc[ind, metric_col_name('ac')] = True
+                    systems_cleaned.loc[ind, metric_col_name('power')] = True
+    # by prior exploration, there are 3 sites with no data.
+    # let us go ahead and remove them
+    systems_cleaned_no_data = systems_cleaned[
+        (~systems_cleaned['is_prize_data'])
+        & (~systems_cleaned['is_lake_parquet_data'])
+        & (~systems_cleaned['is_lake_csv_data'])
+    ]
+    no_data_systems = set(systems_cleaned_no_data['system_id'])
+    assert (no_data_systems == {7334, 12423, 12494})
+    # Systems 12423 and 12494 are acknowledged by the metadata
+    # to have no first_timestamp or last_timestamp
+    # System 7334 may be a duplicate of System 7333 with a
+    # different sampling time.
+    for system_id in no_data_systems:
+        relevant_rows = systems_cleaned.loc[
+                systems_cleaned.loc[:, 'system_id'] == system_id
+        ]
+        systems_cleaned.drop(index=relevant_rows.index)
     # finally, save the data!
     permanent_systems_cleaned_path = Path(
         '../../data/core/systems_cleaned.csv'

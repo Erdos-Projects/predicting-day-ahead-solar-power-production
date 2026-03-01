@@ -1,36 +1,17 @@
-'''Download all data from all
-parquet-stored systems.'''
-import pandas as pd
+'''Download the main metadata source.'''
+
+from pathlib import Path
+import os
 import boto3
 from botocore.handlers import disable_signing
 import time
-import os
-from pathlib import Path
 
-# choices -- choose here
-# add logs?
-add_logs = True
-# 156 parquet systems in general [temporarily indexed 0-155]
-# either run it for a very long time,
-# or download in batches to fit your schedule/availability
-# Will not download a file twice,
-# so can re-run with full range to double-check
-i_start = 80
-i_end = 155
-
-# prepare for future pandas 3.0 usage
-pd.options.mode.copy_on_write = True
+# single choice
+add_logs = False
 
 s3 = boto3.resource("s3")
 s3.meta.client.meta.events.register("choose-signer.s3.*", disable_signing)
 bucket = s3.Bucket("oedi-data-lake")
-
-systems_cleaned = pd.read_csv('../../data/core/systems_cleaned.csv')
-parquet_systems = systems_cleaned.loc[
-    systems_cleaned.loc[:, 'is_lake_parquet_data']
-]  # is already boolean!
-all_parquet_system_ids = list(parquet_systems.system_id.unique())
-all_parquet_system_ids.sort()
 
 
 def downloader_mk_2(
@@ -164,30 +145,88 @@ def downloader_mk_2(
         return True
 
 
-def download_index_set(j_start, j_end):
-    '''Download from the j_start position on the list
-    to the j_end position on the list'''
-    for j in range(j_start, j_end+1):
-        print(f'j={j}')
-        system_id = all_parquet_system_ids[j]
-        print(f'system_id={system_id}')
-        st = time.time()
+if __name__ == '__main__':
+    # download the sources_file
+    downloader_mk_2(
+        '../../data/raw/',
+        'pvdaq/csv/systems_20250729.csv',
+        make_logs=add_logs,
+        log_path='../../logs/log_systems_metadata.csv',
+        data_directory_description="Metadata for all systems."
+    )
+    print("Proceeding to download data from prize data.")
+    # by manual inspection, there are 5 sites in the prize data,
+    prize_system_ids = [2105, 2107, 7333, 9068, 9069]
+    for system_id in prize_system_ids:
+        # download the metadata
         downloader_mk_2(
-            f'../../../data_ds_project/systems/parquet/{system_id}/',
-            f'pvdaq/parquet/pvdata/system_id={system_id}/',
+            '../../data/raw/prize-metadata/',
+            f'pvdaq/2023-solar-data-prize/{system_id}_OEDI/metadata/',
             warn_empty=True,
             make_logs=add_logs,
-            log_path=f'../../logs/logs_system_id={system_id}.csv',
-            data_directory_description=f'Parquet Data for System {system_id}'
+            log_path=f'../../logs/{system_id}_prize_metadata.csv',
+            data_directory_description="Metadata for "
+            + f'site {system_id}, prize data'
         )
-        et = time.time()
-        duration = (et-st)/60
-        print(f'Finished system_id {system_id} in {duration:.4f} minutes.')
-        # if significant duration, space out download calls
-        if duration > 1.5:
-            time.sleep(90)
+    # Note that 7333 is a really-fast-reporting location,
+    # and has downsampled its data in a different folder.
+    # We grab the metadata for reference
+    downloader_mk_2(
+        '../../data/raw/prize-metadata/',
+        'pvdaq/2023-solar-data-prize/7333_5_min_OEDI/metadata/',
+        warn_empty=True,
+        make_logs=add_logs,
+        log_path='../../logs/7333_5_min_metadata.csv',
+        data_directory_description="Metadata for "
+        + 'site 7333, downsampled, prize data'
+    )
 
+    print("Proceeding to download data from parquet data.")
+    # We begin by downloading metadata.
+    # late change -- need modules metadata for solar panel type.
+    downloader_mk_2(
+        "../../data/raw/parquet-modules/",
+        "pvdaq/parquet/modules/",
+        warn_empty=True,
+        make_logs=add_logs,
+        log_path='../../logs/parquet_modules_metadata.csv',
+        data_directory_description="Metadata for "
+        + 'parquet data systems -- solar panel module composition'
+    )
+    downloader_mk_2(
+        "../../data/raw/parquet-metrics/",
+        "pvdaq/parquet/metrics/",
+        make_logs=add_logs,
+        log_path='../../logs/parquet_metrics_metadata.csv',
+        data_directory_description="Metadata for "
+        + 'parquet data systems -- metrics list.'
+    )
+    downloader_mk_2(
+        "../../data/raw/parquet-sites/",
+        "pvdaq/parquet/site/",
+        make_logs=add_logs,
+        log_path='../../logs/parquet_sites_metadata.csv',
+        data_directory_description="Metadata for "
+        + 'parquet data systems -- site information'
+    )
+    downloader_mk_2(
+        "../../data/raw/parquet-systems/",
+        "pvdaq/parquet/system/",
+        make_logs=add_logs,
+        log_path='../../logs/parquet_systems_metadata.csv',
+        data_directory_description="Metadata for "
+        + 'parquet data -- system information'
+    )
 
-if __name__ == '__main__':
-    print(len(all_parquet_system_ids))
-    download_index_set(i_start, i_end)
+    print("Proceeding to download metadata from csv data.")
+    downloader_mk_2(
+        "../../data/raw/csv-metadata/",
+        "pvdaq/csv/system_metadata/",
+        warn_empty=False,
+        is_specific_file_type=True,
+        specific_file_type='.json',
+        make_logs=add_logs,
+        log_path='../../logs/csv_metadata.csv',
+        data_directory_description="Metadata for "
+        + 'csv-reported data'
+    )
