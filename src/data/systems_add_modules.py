@@ -13,7 +13,7 @@ pd.options.mode.copy_on_write = True
 
 
 def simplified_classifier(row):
-    cell_type = row['type']
+    cell_type = row['module_type']
     cell_type = cell_type.lower()
     if ('mono' in cell_type):
         return 'monocrystalline_Si'
@@ -41,8 +41,8 @@ if __name__ == '__main__':
     )
     systems_cleaned = pd.read_csv(permanent_systems_cleaned_path)
     numrows = systems_cleaned.shape[0]
-    systems_cleaned['type'] = pd.Series(
-        ['']*numrows, name='type', dtype='str'
+    systems_cleaned['module_type'] = pd.Series(
+        ['']*numrows, name='module_type', dtype='str'
     )
     print('Adding module type for prize systems')
     prize_system_ids = [2105, 2107, 7333, 9068, 9069]
@@ -65,7 +65,7 @@ if __name__ == '__main__':
                 systems_cleaned.loc[:, 'system_id'] == system_id
             ]
             for ind in relevant_rows.index:
-                systems_cleaned.loc[ind, 'type'] = module_type
+                systems_cleaned.loc[ind, 'module_type'] = module_type
     print('Reading modules data for parquet sites.')
     modules_dir = Path('../../data/raw/parquet-modules/')
     modules_pq = pq.ParquetDataset(modules_dir)
@@ -84,7 +84,7 @@ if __name__ == '__main__':
             systems_cleaned.loc[:, 'system_id'] == system_id
         ]
         for ind in relevant_rows.index:
-            systems_cleaned.loc[ind, 'type'] = module_type
+            systems_cleaned.loc[ind, 'module_type'] = module_type
     print('Reading modules data for csv sites.')
     csv_metadata_dir = Path('../../data/raw/csv-metadata/')
     # now grab the json files, infer the system_id, and
@@ -106,7 +106,7 @@ if __name__ == '__main__':
                 systems_cleaned.loc[:, 'system_id'] == system_id
             ]
             for ind in relevant_rows.index:
-                systems_cleaned.loc[ind, 'type'] = module_type
+                systems_cleaned.loc[ind, 'module_type'] = module_type
     # add the simpified type
     systems_cleaned['simplified_type'] = systems_cleaned.apply(
         simplified_classifier, axis=1
