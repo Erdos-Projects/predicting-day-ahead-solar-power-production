@@ -266,7 +266,7 @@ if __name__ == '__main__':
         relevant_rows = systems_cleaned.loc[
                 systems_cleaned.loc[:, 'system_id'] == system_id
         ]
-        systems_cleaned.drop(index=relevant_rows.index)
+        systems_cleaned = systems_cleaned.drop(index=relevant_rows.index)
     # finally, save the data!
     permanent_systems_cleaned_path = Path(
         '../../data/core/systems_cleaned.csv'
