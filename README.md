@@ -37,8 +37,6 @@ The [PVDAQ Public Data Lake - Parquet](https://data.openei.org/s3_viewer?bucket=
 ## Modeling approach
 Our modeling assumption is more-or-less Degradation (estimated) = f(Site), where site data includes location (latitude, longitude), meteorological data (both locally recorded and the [NSRDB satellite data](https://nsrdb.nrel.gov/)), the type of materials in the solar cell, and the database data on Power generation, Ambient or Module Temperature, and something called [irradiance](https://en.wikipedia.org/wiki/Irradiance).  
 
-Our predictive features are currently all categorical, so we are using one hot encoding with dummy variables. This is expected to change.
-
 ### Getting the degradation estimates via RdTools
 Actually getting estimates of our response variable, degradation, is a nontrivial amount of work.  The steps are as follows, as adapted from https://rdtools.readthedocs.io/en/stable/examples/degradation_and_soiling_example.html.
 
@@ -52,7 +50,7 @@ Actually getting estimates of our response variable, degradation, is a nontrivia
 8.  Get degradation estimate.
 9.  Correct for any soiling.  If the panel has accumulated dust on top, and it gets cleaned off all at once, we need to correct for the spike in power.
 
-### Stretch goal -- PVDeg as a stronger competitor than DummyClassifier.
+### Stretch goal -- PVDeg as a stronger competitor than DummyRegressor.
 The [PVDeg](https://pvdegradationtools.readthedocs.io/en/latest/#) package is also relevant to our analysis.  It is purely simulated data, but it has some strong numerical-methods behind it.  (I seem to recall the phrase, "finite-element analysis", being tossed around.)
 
 Basically, the workflow there is:
