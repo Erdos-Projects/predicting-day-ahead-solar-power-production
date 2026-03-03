@@ -6,6 +6,7 @@ from botocore.handlers import disable_signing
 import time
 import os
 from pathlib import Path
+import concurrent.futures
 
 # choices -- choose here
 # add logs?
@@ -15,8 +16,10 @@ add_logs = True
 # or download in batches to fit your schedule/availability
 # Will not download a file twice,
 # so can re-run with full range to double-check
-i_start = 80
-i_end = 155
+i_start = 29
+i_end = 155   #155 is the highest index
+# maximum concurrent downloads (tune as needed)
+max_workers = 64
 
 # prepare for future pandas 3.0 usage
 pd.options.mode.copy_on_write = True
@@ -39,7 +42,8 @@ def downloader_mk_2(
     specific_file_type='',
     make_logs=False,
     log_path='../../logs/logs.csv',
-    data_directory_description=''
+    data_directory_description='',
+    s3_bucket=None
 ):
     '''Download a file or collection of files from the
     OEDI PVDAQ Data Lake.
@@ -68,15 +72,16 @@ def downloader_mk_2(
     data_directory_description: str
         The describing text you want in data_inventory.csv
     '''
-    global bucket
     downloads_list = []
+    # allow using a provided s3 Bucket (useful for per-thread buckets)
+    bucket_to_use = s3_bucket if s3_bucket is not None else bucket
     if path_to_dir_local[-1] != '/' and path_to_dir_local[-1] != '\\':
         raise ValueError('Local path does not end in "/" or "\\",'
                          + ' and hence is not a possible directory!')
     my_local_dir = Path(path_to_dir_local)
     if not my_local_dir.is_dir():
         my_local_dir.mkdir()
-    objects = bucket.objects.filter(
+    objects = bucket_to_use.objects.filter(
         Prefix=path_to_dir_online
     )
     # check if no objects
@@ -110,7 +115,7 @@ def downloader_mk_2(
                     type_valid = True
                 if type_valid:
                     download_time = time.time()
-                    bucket.download_file(
+                    bucket_to_use.download_file(
                         obj.key, file_path
                     )
                     sources_download = {
@@ -167,25 +172,50 @@ def downloader_mk_2(
 def download_index_set(j_start, j_end):
     '''Download from the j_start position on the list
     to the j_end position on the list'''
-    for j in range(j_start, j_end+1):
-        print(f'j={j}')
+    def _download_system(j):
+        print(f'[Worker {j}] Starting index j={j}')
         system_id = all_parquet_system_ids[j]
-        print(f'system_id={system_id}')
+        print(f'[Worker {j}] system_id={system_id}')
         st = time.time()
-        downloader_mk_2(
-            f'../../../data_ds_project/systems/parquet/{system_id}/',
-            f'pvdaq/parquet/pvdata/system_id={system_id}/',
-            warn_empty=True,
-            make_logs=add_logs,
-            log_path=f'../../logs/logs_system_id={system_id}.csv',
-            data_directory_description=f'Parquet Data for System {system_id}'
-        )
+        # create a per-thread s3 Bucket/resource to avoid any shared-state issues
+        s3_local = boto3.resource("s3")
+        s3_local.meta.client.meta.events.register("choose-signer.s3.*", disable_signing)
+        bucket_local = s3_local.Bucket("oedi-data-lake")
+        try:
+            downloader_mk_2(
+                f'../../../data_ds_project/systems/parquet/{system_id}/',
+                f'pvdaq/parquet/pvdata/system_id={system_id}/',
+                warn_empty=True,
+                make_logs=add_logs,
+                log_path=f'../../logs/logs_system_id={system_id}.csv',
+                data_directory_description=f'Parquet Data for System {system_id}',
+                s3_bucket=bucket_local
+            )
+        except Exception:
+            raise
         et = time.time()
         duration = (et-st)/60
-        print(f'Finished system_id {system_id} in {duration:.4f} minutes.')
-        # if significant duration, space out download calls
+        print(f'[Worker {j}] Finished system_id {system_id} in {duration:.4f} minutes.')
+        # if significant duration, space out download calls (per-thread sleep)
         if duration > 1.5:
-            time.sleep(90)
+            time.sleep(10)
+        return j, system_id, duration
+
+    total = j_end - j_start + 1
+    workers = min(max_workers, total)
+    print(f'[Main] Starting parallel downloads: {total} systems with {workers} workers')
+    completed_count = 0
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = {executor.submit(_download_system, j): j for j in range(j_start, j_end+1)}
+        for fut in concurrent.futures.as_completed(futures):
+            j = futures[fut]
+            try:
+                j_val, system_id, duration = fut.result()
+                completed_count += 1
+                print(f'[Main] Completed {completed_count}/{total}: index {j_val}, system_id {system_id}')
+            except Exception as e:
+                print(f'[Main] Error downloading index {j}: {e}')
+    print(f'[Main] All downloads complete. Total: {completed_count}/{total} systems')
 
 
 if __name__ == '__main__':
