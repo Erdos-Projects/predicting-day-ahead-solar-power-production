@@ -8,3 +8,4 @@ botocore
 RdTools
 pvlib
 pvdeg
+tqdm

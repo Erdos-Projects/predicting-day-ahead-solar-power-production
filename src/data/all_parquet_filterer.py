@@ -94,6 +94,7 @@ all_parquet_system_ids.sort()
 metrics_dir = Path("../../data/raw/parquet-metrics/")
 metrics_pq = pq.ParquetDataset(metrics_dir)
 metrics_df = metrics_pq.read().to_pandas()
+metrics_id_set = set(metrics_df['system_id'])
 
 all_data_systems = systems_cleaned[
     systems_cleaned['has_current_data']
@@ -103,7 +104,7 @@ all_data_systems = systems_cleaned[
     & systems_cleaned['has_voltage_data']
 ]
 all_rich_parquet_data_ids = set(all_data_systems.system_id.unique()).intersection(
-    set(all_parquet_system_ids)
+    set(all_parquet_system_ids), metrics_id_set
 )
 all_rich_parquet_data_ids = list(all_rich_parquet_data_ids)
 all_rich_parquet_data_ids.sort()
@@ -127,7 +128,9 @@ def filter_data(system_id: int):
     target_dir = Path(f'../../../data_ds_project/filtered/systems/parquet/{system_id}/')
     if not target_dir.is_dir():  # if the directory does exist, assumed nothing to do.
         target_dir.mkdir(parents=True)
-        for year in range(1997, 2026):
+        # according to systems_cleaned.csv, some systems started in 1994
+        # that is good enough for now.
+        for year in range(1994, 2026):
             current_year_pq = pq.ParquetDataset(
                 access_system_dir,
                 filters=[
