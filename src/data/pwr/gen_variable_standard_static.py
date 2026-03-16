@@ -365,7 +365,8 @@ def find_all_variable_names_gen_mod(var_aggs_dict,
                                     sources_matter: bool,
                                     known_sources=('inverter', 'meter'),
                                     known_sources_short=('inv', 'met'),
-                                    systems_cleaned=None):
+                                    systems_cleaned=None,
+                                    hard_stop_on_singleton: bool =True):
     '''Add subsystem names to aggregation names for each Parquet system.
 
     Parameters
@@ -394,7 +395,11 @@ def find_all_variable_names_gen_mod(var_aggs_dict,
     systems_cleaned: pd.DataFrame or None
         Only needed if var_aggs_dict or var_aggs_metadata is None
         systems_cleaned file to check for valid system_id's in first part
-
+    hard_stop_on_singleton: bool
+        If True (default), error out if only one subpart for a system
+        to permit re-evaluation of aggregate metrics.
+        If False, let it keep going.
+        (Option added to handle a weird case in voltage.)
     Returns
     -----------
     var_total_dict: dict[list[dict]]
@@ -508,7 +513,29 @@ def find_all_variable_names_gen_mod(var_aggs_dict,
                         print(f'System {system_id} has only one {source_type}-type '
                               + f'subpart for {var_name}!')
                         print(var_subparts_known_type.iloc[0, :])
-                        raise ValueError('Incorrect subpart description, presumably.')
+                        if hard_stop_on_singleton:
+                            raise ValueError('Incorrect subpart description, presumably.')
+                        else:  # no common prefix, just index 0
+                            var_parts_metadata.loc[
+                                system_id, metadata_agg_subtype_name(var_name, source_type)
+                            ] = True
+                            var_parts_metadata.loc[
+                                system_id, metadata_part_subtype_name(var_name, source_type)
+                            ] = True
+                            only_metric = var_subparts_known_type.iloc[0, :]
+                            var_total_dict[system_id].append({
+                                'metric_id': only_metric['metric_id'],
+                                'sensor_name': only_metric['sensor_name'],
+                                'common_name': only_metric['common_name'],
+                                'units': only_metric['units'],
+                                'calc_details': only_metric['calc_details'],
+                                'whole_or_part': 'part',
+                                'source_type': source_type,
+                                'index': 0
+                            })
+                            relevant_rows_non_agg_metrics = relevant_rows_non_agg_metrics.drop(
+                                index=var_subparts_known_type.index
+                            )
                     # if 0 of known type, just pass on!
             else:  # no source_type, just start making prefixes and suffixes
                 relevant_rows_non_agg_metrics = relevant_rows_non_agg_metrics.sort_values('sensor_name')
@@ -539,7 +566,48 @@ def find_all_variable_names_gen_mod(var_aggs_dict,
         elif num_subparts == 1:  # only one subpart?  Presumably a missing aggregate name
             print(f'System {system_id} has only one subpart for {var_name}!')
             print(relevant_rows_non_agg_metrics.iloc[0, :])
-            raise ValueError('Incorrect subpart description, presumably.')
+            if hard_stop_on_singleton:
+                raise ValueError('Incorrect subpart description, presumably.')
+            else:  # no common prefix and suffix, just have index 0 with full name.
+                var_parts_metadata.loc[system_id, metadata_part_name(var_name)] = True
+                if sources_matter:
+                    for j in range(len(known_sources)):
+                        source_type = known_sources[j]
+                        source_fragment = known_sources_short[j]
+                        var_subparts_known_type = widened_search_for_fragment_df(
+                            relevant_rows_non_agg_metrics, source_fragment
+                        )
+                        num_known_type = var_subparts_known_type.shape[0]
+                        # debug
+                        print(num_known_type)
+                        if num_known_type > 0:
+                            var_parts_metadata.loc[
+                                system_id, metadata_part_subtype_name(var_name, source_type)
+                            ] = True
+                            only_metric = var_subparts_known_type.iloc[0, :]
+                            var_total_dict[system_id].append({
+                                'metric_id': only_metric['metric_id'],
+                                'sensor_name': only_metric['sensor_name'],
+                                'common_name': only_metric['common_name'],
+                                'units': only_metric['units'],
+                                'calc_details': only_metric['calc_details'],
+                                'whole_or_part': 'part',
+                                'source_type': source_type,
+                                'index': 0
+                            })
+                            # only one type per single metric, so
+                            break
+                else:
+                    only_metric = relevant_rows_non_agg_metrics.iloc[0, :]
+                    var_total_dict[system_id].append({
+                        'metric_id': only_metric['metric_id'],
+                        'sensor_name': only_metric['sensor_name'],
+                        'common_name': only_metric['common_name'],
+                        'units': only_metric['units'],
+                        'calc_details': only_metric['calc_details'],
+                        'whole_or_part': 'part',
+                        'index': 0
+                    })
         # if 0 sub-parts, move to the next system_id
     var_total_metadata_df = pd.merge(left=var_aggs_metadata,
                                      right=var_parts_metadata,
