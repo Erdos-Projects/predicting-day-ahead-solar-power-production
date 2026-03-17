@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 class Clean:
-    def __init__(self, system_id, path):
+    def __init__(self, system_id=0, path=""):
         """initialize object
 
         Args:
@@ -107,5 +107,20 @@ class Clean:
 
     def system_info(self):
         pass
+
+    def missing_days(self, data : pd.DataFrame):
+        """missing days?
+
+        Args:
+            data (pd.DataFrame): time/power dataframe containing daily averages.
+        
+        Returns:
+            list of days that are skipped over
+        """
+        df = data.copy() #might want to edit/add columns
+        df['date_diff'] = df['time'].diff()
+        return df[df["date_diff"] > pd.Timedelta(days=1)]
+
+
 
 
