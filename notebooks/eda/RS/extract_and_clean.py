@@ -120,7 +120,33 @@ class Clean:
         df = data.copy() #might want to edit/add columns
         df['date_diff'] = df['time'].diff()
         return df[df["date_diff"] > pd.Timedelta(days=1)]
+    
+    def fill_missing_days_na(self, data : pd.DataFrame):
+        """fills in missing days with NaN values
 
+        Args:
+            data (pd.DataFrame): data (time and power columns)
+        Returns:
+            dataframe : containing the data df along with the missing days (power value Na)
+        """
+        #make sure everything is of the correct type and not editing original dataframe
+        df = data.copy()
+        df['time'] = pd.to_datetime(df['time'])
+        df = df.sort_values('time')
+
+        #dataframe containing ALL the days
+        df = df.set_index('time') #set index to be time 
+        full_range = pd.date_range(
+            start=df.index.min(),
+            end=df.index.max(),
+            freq='D'  #goes up 1 day at a time
+        )
+
+        df_full = df.reindex(full_range)
+
+        df_full = df_full.reset_index().rename(columns={'index': 'time'})
+
+        return df_full
 
 
 
