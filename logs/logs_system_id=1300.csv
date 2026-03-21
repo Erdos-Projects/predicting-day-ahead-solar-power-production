@@ -1399,3 +1399,4 @@
 ..\..\data\raw\systems\parquet\1300\system_1300__date_2018_08_02.snappy.000.parquet,pvdaq/parquet/pvdata/system_id=1300/year=2018/month=8/day=2/system_1300__date_2018_08_02.snappy.000.parquet,1771374880.7665422
 ..\..\data\raw\systems\parquet\1300\system_1300__date_2018_08_03.snappy.000.parquet,pvdaq/parquet/pvdata/system_id=1300/year=2018/month=8/day=3/system_1300__date_2018_08_03.snappy.000.parquet,1771374881.5337303
 ..\..\data\raw\systems\parquet\1300\system_1300__date_2018_08_04.snappy.000.parquet,pvdaq/parquet/pvdata/system_id=1300/year=2018/month=8/day=4/system_1300__date_2018_08_04.snappy.000.parquet,1771374881.7368152
+GET request from https://s3.us-west-2.amazonaws.com/nsrdb-data.stratus.nlr.gov/1007752_27.77_-82.62_2019_75167a2871a427c97f7c0e3431283914.csvat time 1773864049.664405

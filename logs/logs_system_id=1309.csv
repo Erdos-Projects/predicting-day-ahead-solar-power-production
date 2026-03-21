@@ -502,3 +502,4 @@
 ..\..\data\raw\systems\parquet\1309\system_1309__date_2016_02_07.snappy.000.parquet,pvdaq/parquet/pvdata/system_id=1309/year=2016/month=2/day=7/system_1309__date_2016_02_07.snappy.000.parquet,1771380737.1903412
 ..\..\data\raw\systems\parquet\1309\system_1309__date_2016_02_08.snappy.000.parquet,pvdaq/parquet/pvdata/system_id=1309/year=2016/month=2/day=8/system_1309__date_2016_02_08.snappy.000.parquet,1771380737.415711
 ..\..\data\raw\systems\parquet\1309\system_1309__date_2016_02_09.snappy.000.parquet,pvdaq/parquet/pvdata/system_id=1309/year=2016/month=2/day=9/system_1309__date_2016_02_09.snappy.000.parquet,1771380737.6336737
+GET request from https://s3.us-west-2.amazonaws.com/nsrdb-data.stratus.nlr.gov/1005282_27.81_-82.74_2019_b661e48dd114a257b4802184862b079a.csvat time 1773864080.8059092

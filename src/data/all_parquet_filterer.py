@@ -47,34 +47,31 @@ def metrics_search_for_two_fragments_df(df: pd.DataFrame, fragment_1: str,
 def load_relevant_data(metrics_df: pd.DataFrame,
                        system_id: int):
     relevant_rows_metrics = metrics_df[metrics_df['system_id'] == system_id]
-    trimmed_relevant_rows_metrics = relevant_rows_metrics[
-        ['metric_id', 'sensor_name', 'common_name', 'units']
-    ]
     ac_pow_metrics = metrics_search_for_two_fragments_df(
-        trimmed_relevant_rows_metrics, 'ac', 'pow', 'and'
+        relevant_rows_metrics, 'ac', 'pow', 'and'
     )
     # drop power factor, etc.
     dc_pow_metrics = metrics_search_for_two_fragments_df(
-        trimmed_relevant_rows_metrics, 'dc', 'pow', 'and'
+        relevant_rows_metrics, 'dc', 'pow', 'and'
     )
     volt_metrics = metrics_search_for_fragment_df(
-        trimmed_relevant_rows_metrics, 'volt'
+        relevant_rows_metrics, 'volt'
     )
     # drop percentages for now
     volt_metrics = volt_metrics[
         volt_metrics['units'] == 'V'
     ]
     curr_metrics = metrics_search_for_fragment_df(
-        trimmed_relevant_rows_metrics, 'curr'
+        relevant_rows_metrics, 'curr'
     )
     irrad_metrics = metrics_search_for_fragment_df(
-        trimmed_relevant_rows_metrics, 'irrad'
+        relevant_rows_metrics, 'irrad'
     )
     temp_metrics = metrics_search_for_fragment_df(
-        trimmed_relevant_rows_metrics, 'temp'
+        relevant_rows_metrics, 'temp'
     )
     err_metrics = metrics_search_for_two_fragments_df(
-        trimmed_relevant_rows_metrics, 'err', 'fault', 'or'
+        relevant_rows_metrics, 'err', 'fault', 'or'
     )
     return pd.concat(
         [ac_pow_metrics, dc_pow_metrics,
