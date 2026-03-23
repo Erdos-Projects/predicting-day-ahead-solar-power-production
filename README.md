@@ -4,8 +4,7 @@ Project completed for Erdos institute data science bootcamp (fall-2025)
 ### Team members
 1. [Roberta Shapiro](https://github.com/ShapiroRH)
 2. [Charles Baker](https://github.com/ch83baker)
-3. [Alex Myers](https://github.com/MyersAlex924)
-4. [William Grodzicki](https://github.com/wpgrodzicki)
+3. [William Grodzicki](https://github.com/wpgrodzicki)
 
 ## Project overview
 We hope to develop tools for analyzing and predicting photovoltaic-cell degradation in solar panels using location, meteorological data, and installation type
