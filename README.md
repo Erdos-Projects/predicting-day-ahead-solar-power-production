@@ -6,6 +6,9 @@ Project completed for Erdos institute data science bootcamp (fall-2025)
 2. [Charles Baker](https://github.com/ch83baker)
 3. [William Grodzicki](https://github.com/wpgrodzicki)
 
+### Acknowledgment
+We give thanks for the assistance of [Alex Myers](https://github.com/MyersAlex924), who as a founding team member helped us find the Open-Meteo satellite data, among other contributions in the early stage of the project.
+
 ## Project overview
 We hope to develop tools for analyzing and predicting photovoltaic-cell degradation in solar panels using location, meteorological data, and installation type
 
