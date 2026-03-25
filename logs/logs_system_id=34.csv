@@ -1,0 +1,6 @@
+GET request from https://developer.nlr.gov/api/nsrdb/v2/solar/nsrdb-GOES-aggregated-v4-0-0-download.csv?names=2011.0&wkt=POINT%28-115.1582+36.1952%29&interval=60&attributes=dhi&attributes=clearsky_dhi&attributes=cloud_fill_flag&utc=false&leap_day=true&api_key=x4fpo75TXNdKUVZ87XVPJDO94EPtEWupG8nfShaB&email=ch83baker%40gmail.comat time 1773863079.3678403
+GET request from https://developer.nlr.gov/api/nsrdb/v2/solar/nsrdb-GOES-aggregated-v4-0-0-download.csv?names=2011&wkt=POINT%28-115.1582+36.1952%29&interval=60&attributes=dhi&attributes=clearsky_dhi&attributes=cloud_fill_flag&utc=false&leap_day=true&api_key=x4fpo75TXNdKUVZ87XVPJDO94EPtEWupG8nfShaB&email=ch83baker%40gmail.comat time 1773863217.9642227
+GET request from https://s3.us-west-2.amazonaws.com/nsrdb-data.stratus.nlr.gov/260505_36.21_-115.14_2011_7cfa1fa0b1cf94756eb40f9a093a5e8d.csvat time 1773863442.7651377
+GET request from https://s3.us-west-2.amazonaws.com/nsrdb-data.stratus.nlr.gov/260505_36.21_-115.14_2011_7cfa1fa0b1cf94756eb40f9a093a5e8d.csvat time 1774314499.2063282
+GET request from https://s3.us-west-2.amazonaws.com/nsrdb-data.stratus.nlr.gov/260505_36.21_-115.14_2011_7cfa1fa0b1cf94756eb40f9a093a5e8d.csvat time 1774315657.50263
+GET request from https://s3.us-west-2.amazonaws.com/nsrdb-data.stratus.nlr.gov/260505_36.21_-115.14_2011_7cfa1fa0b1cf94756eb40f9a093a5e8d.csvat time 1774316430.6276503

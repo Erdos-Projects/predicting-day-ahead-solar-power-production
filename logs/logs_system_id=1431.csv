@@ -2955,3 +2955,9 @@
 ..\..\data\raw\systems\parquet\1431\system_1431__date_2018_01_07.snappy.000.parquet,pvdaq/parquet/pvdata/system_id=1431/year=2018/month=1/day=7/system_1431__date_2018_01_07.snappy.000.parquet,1771388878.8621218
 ..\..\data\raw\systems\parquet\1431\system_1431__date_2018_01_08.snappy.000.parquet,pvdaq/parquet/pvdata/system_id=1431/year=2018/month=1/day=8/system_1431__date_2018_01_08.snappy.000.parquet,1771388879.059941
 ..\..\data\raw\systems\parquet\1431\system_1431__date_2018_01_09.snappy.000.parquet,pvdaq/parquet/pvdata/system_id=1431/year=2018/month=1/day=9/system_1431__date_2018_01_09.snappy.000.parquet,1771388879.3076997
+<<<<<<< HEAD
+=======
+GET request from https://s3.us-west-2.amazonaws.com/nsrdb-data.stratus.nlr.gov/478470_39.89_-105.22_2010_78860745d6a662f762e4d988f18304ba.csvat time 1773864271.8440318
+GET request from https://s3.us-west-2.amazonaws.com/nsrdb-data.stratus.nlr.gov/478470_39.89_-105.22_2010_78860745d6a662f762e4d988f18304ba.csvat time 1774315036.5853033
+GET request from https://s3.us-west-2.amazonaws.com/nsrdb-data.stratus.nlr.gov/478470_39.89_-105.22_2010_78860745d6a662f762e4d988f18304ba.csvat time 1774315986.5996835
+>>>>>>> c5e16d7 (Survive the merge)
