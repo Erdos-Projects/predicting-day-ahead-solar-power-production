@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 from pathlib import Path
+from datetime import datetime
+from copy import deepcopy
 
 
 def metrics_search_for_fragment_df(df: pd.DataFrame, fragment: str):
@@ -366,7 +368,7 @@ def find_all_variable_names_gen_mod(var_aggs_dict,
                                     known_sources=('inverter', 'meter'),
                                     known_sources_short=('inv', 'met'),
                                     systems_cleaned=None,
-                                    hard_stop_on_singleton: bool =True):
+                                    hard_stop_on_singleton: bool = True):
     '''Add subsystem names to aggregation names for each Parquet system.
 
     Parameters
@@ -615,6 +617,257 @@ def find_all_variable_names_gen_mod(var_aggs_dict,
                                      left_index=True,
                                      right_index=True)
     return (var_total_dict, var_total_metadata_df)
+
+
+# sometimes variables never have data attached
+# we check for this
+def check_variable_data_exists(
+        var_total_dict,
+        var_total_metadata_df,
+        path_to_raw_data_dir: str,
+        var_name: str,
+        sources_matter: bool,
+        known_sources=('inverter', 'meter'),
+        known_sources_short=('inv', 'met'),
+):
+    '''For every variable in parquet data,
+    check if at least one data point associated with it.
+
+    Parameters
+    ------------
+    var_total_dict
+        The first output from find_all_variable_names_gen_mod(*args)
+        or a modification thereof
+    var_total_metadata_df
+        The second output from find_all_variable_names_gen_mod(*args)
+        or a modification thereof
+    path_to_raw_data_dir: str
+        Path to the raw parquet directory (ending in /systems/parquet/)
+    var_name: str
+        the variable name
+    sources_matter: bool
+        If True, collect data about where the terms are located.
+        If False, do not collect such data
+    known_sources: iterable of strings
+        An iterable of known sources.
+    known_sources_short: iterable of strings
+        An iterable of shorthands.  Must be the same length as known_sources.
+
+    Returns
+    --------
+    var_total_dict
+        Trimmed input that removes all variables with no data attached.
+    var_total_metadata_df
+        Modified input that changes True's to False's as appropriate.
+    '''
+    known_sources, known_sources_short = sources_checker(
+        known_sources=known_sources, known_sources_short=known_sources_short
+    )
+    for system_id in var_total_dict.keys():
+        # debug
+        print(system_id)
+        system_dir = Path(path_to_raw_data_dir + f'{system_id}/')
+        if not system_dir.is_dir():
+            raise ValueError('Mislocated system raw data path')
+        to_pop = []
+        affected_whole_or_part = set()
+        affected_sources = set()
+        for e, metric_dict in enumerate(var_total_dict[system_id]):
+            data_exists = False
+            target_metric_id = metric_dict['metric_id']
+            for year in range(1994, 2026):
+                current_year_pq = pq.ParquetDataset(
+                    system_dir,
+                    filters=[
+                        ('metric_id', '==', target_metric_id),
+                        ('measured_on', '>=', datetime(year, 1, 1)),
+                        ('measured_on', '<', datetime(year+1, 1, 1))
+                    ]
+                )
+                current_year_df = current_year_pq.read().to_pandas()
+                if current_year_df.shape[0] > 0:
+                    data_exists = True
+                    break
+            if not data_exists:
+                to_pop.append(e)
+                affected_whole_or_part.add(metric_dict['whole_or_part'])
+                if sources_matter:
+                    affected_sources.add(metric_dict['source_type'])
+        if len(to_pop) > 0:
+            to_pop.sort()
+            # pop in reverse order to avoid problems
+            for ind in to_pop[::-1]:
+                var_total_dict[system_id].pop(ind)
+            # if no terms left, remove
+            if len(var_total_dict[system_id]) == 0:
+                var_total_dict.pop(system_id)
+                var_total_metadata_df.drop(index=system_id)
+            # otherwise, redo the affected metadata
+            else:
+                var_total_metadata_df.loc[
+                    system_id, metadata_agg_name(var_name)
+                ] = False
+                var_total_metadata_df.loc[
+                    system_id, metadata_part_name(var_name)
+                ] = False
+                if sources_matter:
+                    for source_type in known_sources:
+                        var_total_metadata_df.loc[
+                            system_id, metadata_agg_subtype_name(var_name, source_type)
+                        ] = False
+                    var_total_metadata_df.loc[
+                        system_id, metadata_part_subtype_name(var_name, source_type)
+                    ] = False
+                for metric_dict in var_total_dict[system_id]:
+                    if metric_dict['whole_or_part'] == 'whole':
+                        var_total_metadata_df.loc[
+                            system_id, metadata_agg_name(var_name)
+                        ] = True
+                        if sources_matter:
+                            var_total_metadata_df.loc[
+                                system_id, metadata_agg_subtype_name(
+                                    var_name, metric_dict['source_type']
+                                )
+                            ] = True
+                    elif metric_dict['whole_or_part'] == 'part':
+                        var_total_metadata_df.loc[
+                            system_id, metadata_part_name(var_name)
+                        ] = True
+                        if sources_matter:
+                            var_total_metadata_df.loc[
+                                system_id, metadata_part_subtype_name(
+                                    var_name, metric_dict['source_type']
+                                )
+                            ] = True
+    return (var_total_dict, var_total_metadata_df)
+
+
+# given one system's issues,
+# will redo the above as one-by-one
+# sometimes variables never have data attached
+# we check for this
+def check_variable_data_exists_single_system(
+        var_total_dict,
+        var_total_metadata_df,
+        path_to_raw_data_dir: str,
+        system_id: int,
+        var_name: str,
+        sources_matter: bool,
+        known_sources=('inverter', 'meter'),
+        known_sources_short=('inv', 'met'),
+):
+    '''For every variable in parquet data,
+    check if at least one data point associated with it.
+
+    Parameters
+    ------------
+    var_total_dict
+        The first output from find_all_variable_names_gen_mod(*args)
+        or a modification thereof
+    var_total_metadata_df
+        The second output from find_all_variable_names_gen_mod(*args)
+        or a modification thereof
+    path_to_raw_data_dir: str
+        Path to the raw parquet directory (ending in /systems/parquet/)
+    system_id: int
+        The identifier system
+    var_name: str
+        the variable name
+    sources_matter: bool
+        If True, collect data about where the terms are located.
+        If False, do not collect such data
+    known_sources: iterable of strings
+        An iterable of known sources.
+    known_sources_short: iterable of strings
+        An iterable of shorthands.  Must be the same length as known_sources.
+
+    Returns
+    --------
+    my_var_names: list[dict]
+        Single-system trimmed list of variable dicts:
+    my_var_metadata: pd.DataFrame
+        Single-row DataFrame containing True/False data
+    '''
+    try:
+        my_var_names = deepcopy(var_total_dict[system_id])
+        my_var_metadata = var_total_metadata_df.loc[system_id, :]
+    except KeyError as e:
+        print(f'System {system_id} not included in input!')
+        raise e
+    except BaseException as e:
+        raise e
+    known_sources, known_sources_short = sources_checker(
+        known_sources=known_sources, known_sources_short=known_sources_short
+    )
+    system_dir = Path(path_to_raw_data_dir + f'{system_id}/')
+    if not system_dir.is_dir():
+        raise ValueError('Mislocated system raw data path')
+    to_pop = []
+    for e, metric_dict in enumerate(my_var_names):
+        data_exists = False
+        target_metric_id = metric_dict['metric_id']
+        for year in range(1994, 2026):
+            current_year_pq = pq.ParquetDataset(
+                system_dir,
+                filters=[
+                    ('metric_id', '==', target_metric_id),
+                    ('measured_on', '>=', datetime(year, 1, 1)),
+                    ('measured_on', '<', datetime(year+1, 1, 1))
+                ]
+            )
+            current_year_df = current_year_pq.read().to_pandas()
+            if current_year_df.shape[0] > 0:
+                data_exists = True
+                break
+        if not data_exists:
+            to_pop.append(e)
+    if len(to_pop) > 0:
+        # pop in reverse order to avoid problems
+        to_pop.sort()
+        for ind in to_pop[::-1]:
+            my_var_names.pop(ind)
+        # if no terms left, remove
+        if len(my_var_names) == 0:
+            my_var_names = None
+            my_var_metadata = None
+        # otherwise, redo the affected metadata
+        else:
+            my_var_metadata.loc[
+                metadata_agg_name(var_name)
+            ] = False
+            my_var_metadata.loc[
+                metadata_part_name(var_name)
+            ] = False
+            if sources_matter:
+                for source_type in known_sources:
+                    my_var_metadata.loc[
+                        metadata_agg_subtype_name(var_name, source_type)
+                    ] = False
+                my_var_metadata.loc[
+                    metadata_part_subtype_name(var_name, source_type)
+                ] = False
+            for metric_dict in my_var_names:
+                if metric_dict['whole_or_part'] == 'whole':
+                    my_var_metadata.loc[
+                        metadata_agg_name(var_name)
+                    ] = True
+                    if sources_matter:
+                        my_var_metadata.loc[
+                            metadata_agg_subtype_name(
+                                var_name, metric_dict['source_type']
+                            )
+                        ] = True
+                elif metric_dict['whole_or_part'] == 'part':
+                    my_var_metadata.loc[
+                        metadata_part_name(var_name)
+                    ] = True
+                    if sources_matter:
+                        my_var_metadata.loc[
+                            metadata_part_subtype_name(
+                                var_name, metric_dict['source_type']
+                            )
+                        ] = True
+    return (my_var_names, my_var_metadata)
 
 
 # can and should adjust these naming functions
