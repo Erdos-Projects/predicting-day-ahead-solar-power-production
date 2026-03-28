@@ -448,7 +448,6 @@ def unit_scale_consistency(
     ac_pow_names,
     ac_pow_metadata,
     system_id: int,
-    systems_cleaned: pd.DataFrame
 ):
     (my_metrics, my_metadata, my_data) = ac_power_gather_data(
         all_ac_pow_metrics=ac_pow_names, all_ac_pow_metadata=ac_pow_metadata,
