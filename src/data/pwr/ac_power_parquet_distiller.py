@@ -17,6 +17,8 @@ from tqdm import tqdm
 # 82 (0-81) in general
 i_start = 0
 i_end = 81
+# save as csv or a parquet group?
+save_mode = 'parquet'
 
 # Load system data
 systems_cleaned = pd.read_csv('../../../data/core/systems_cleaned.csv')
@@ -782,8 +784,21 @@ if __name__ == '__main__':
             my_data,
             system_id=system_id
         )
-        output_file = Path(
-            output_dir_str + f'all_data_{system_id}.csv'
-        )
-        output_file.touch()
-        my_renamed_data.to_csv(output_file, index=False)
+        if save_mode == 'csv':
+            output_file = Path(
+                output_dir_str + f'all_data_{system_id}.csv'
+            )
+            output_file.touch()
+            my_renamed_data.to_csv(output_file, index=False)
+        elif save_mode == 'parquet':
+            output_dir_alt_str = f'../../../../data_ds_project/testing_b/{system_id}/'
+            output_dir_alt = Path(output_dir_alt_str)
+            if not output_dir_alt.is_dir():
+                output_dir_alt.mkdir(parents=True)
+            my_renamed_data.loc[:, 'year'] = my_renamed_data['time'].dt.year
+            my_renamed_data.to_parquet(
+                output_dir_alt,
+                partition_cols=['year',]
+            )
+        else:
+            raise ValueError('Invalid save_mode command!')
