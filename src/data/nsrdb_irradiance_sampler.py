@@ -7,7 +7,7 @@ from tqdm import tqdm
 # choices
 make_logs = True
 i_start = 0
-i_end = 10
+i_end = 155
 my_dir_string = '../../../data_ds_project/systems/parquet_irrad_samples/'
 
 systems_cleaned = pd.read_csv('../../data/core/systems_cleaned.csv')
@@ -36,12 +36,13 @@ def download_irradiance_sample(
     ind = relevant_rows_systems.index[0]
     lon = systems_cleaned.loc[ind, 'longitude']
     lat = systems_cleaned.loc[ind, 'latitude']
-    sample_year = int(systems_cleaned.loc[ind, 'sample_year'])
-    if sample_year < 1999:
-        sample_year = 1999
+    first_year = int(systems_cleaned.loc[ind, 'first_year'])
+    # dealing with a weird particular case
+    if first_year < 2001:
+        first_year = 2001
     url_start = 'https://developer.nlr.gov/api/nsrdb/v2/solar/'\
         + 'nsrdb-GOES-aggregated-v4-0-0-download.csv'
-    payload = {'names': sample_year,
+    payload = {'names': first_year + 1,
                'wkt': point_maker(lon, lat),
                'interval': 60,
                'attributes': 'dhi',
@@ -50,7 +51,7 @@ def download_irradiance_sample(
                'api_key': api_key,
                'email': e_mail}
     my_file = Path(
-        my_dir_string + f'{system_id}_{sample_year}_irradiance.csv'
+        my_dir_string + f'{system_id}_{first_year + 1}_irradiance.csv'
     )
     my_file.touch()
     call_time = time.time()

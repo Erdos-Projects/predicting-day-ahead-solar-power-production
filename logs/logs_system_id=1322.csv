@@ -1,0 +1,3 @@
+..\..\..\data_ds_project\systems\parquet\1322\system_1322__date_2012_12_16.snappy.000.parquet,pvdaq/parquet/pvdata/system_id=1322/year=2012/month=12/day=16/system_1322__date_2012_12_16.snappy.000.parquet,1772143348.994306
+..\..\..\data_ds_project\systems\parquet\1322\system_1322__date_2012_12_18.snappy.000.parquet,pvdaq/parquet/pvdata/system_id=1322/year=2012/month=12/day=18/system_1322__date_2012_12_18.snappy.000.parquet,1772143349.2116792
+GET request from https://s3.us-west-2.amazonaws.com/nsrdb-data.stratus.nlr.gov/1005282_27.81_-82.74_2019_b661e48dd114a257b4802184862b079a.csvat time 1773864108.552976

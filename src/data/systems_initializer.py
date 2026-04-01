@@ -247,8 +247,13 @@ if __name__ == '__main__':
                     # by observation, standard outputs have ac_power
                     # and ac_energy as daily averages,
                     # and nothing else
-                    systems_cleaned.loc[ind, metric_col_name('ac')] = True
-                    systems_cleaned.loc[ind, metric_col_name('power')] = True
+                    # but parquet systems are echoed in csv,
+                    # and we do not wish to invent data there.
+                    if not systems_cleaned.loc[ind, 'is_lake_parquet_data']:
+                        systems_cleaned.loc[ind, metric_col_name('ac')] = True
+                        systems_cleaned.loc[
+                            ind, metric_col_name('power')
+                        ] = True
     # by prior exploration, there are 3 sites with no data.
     # let us go ahead and remove them
     systems_cleaned_no_data = systems_cleaned[

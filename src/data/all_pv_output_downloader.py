@@ -17,10 +17,10 @@ add_logs = True
 # or download in batches to fit your schedule/availability
 # Will not download a file twice,
 # so can re-run with full range to double-check
-i_start = 100
-i_end = 1453
+i_start = 0
+i_end = 1455
 # Multitasking?
-is_multitasking = False
+is_multitasking = True
 max_workers = 20
 
 # prepare for future pandas 3.0 usage
@@ -104,6 +104,3 @@ if __name__ == '__main__':
                 )
             except BaseException as e:
                 raise e
-            # some pauses
-            if i % 100 == 99:
-                time.sleep(30)

@@ -78,7 +78,7 @@ def downloader_mk_2(
                          + ' and hence is not a possible directory!')
     my_local_dir = Path(path_to_dir_local)
     if not my_local_dir.is_dir():
-        my_local_dir.mkdir()
+        my_local_dir.mkdir(parents=True)
     objects = bucket_to_use.objects.filter(
         Prefix=path_to_dir_online
     )
