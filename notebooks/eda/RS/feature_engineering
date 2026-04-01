@@ -1,0 +1,98 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from pathlib import Path
+from sklearn.linear_model import LinearRegression
+from pathlib import Path
+
+class Clean:
+    def __init__(self, system_id=0, path=""):
+        """initialize object
+
+        Args:
+            system_id (int): system id
+            path (string): the path UP UNTIL the folder with system id number. DOES include the last /
+        """
+        self.system_id = system_id
+        self.path = path+f'{system_id}/'
+        self.partialpath = path+"/"
+        systems_cleaned = pd.read_csv('../../../data/core/systems_cleaned.csv')
+        row = systems_cleaned.iloc[systems_cleaned['system_id']==self.system_id]
+        self.latitude = row['latitude']
+        self.longitude = row['longitude']
+
+    def calc_energy_lrs(self, data:pd.DataFrame)->int:
+        """approximates energy produced via a left Riemann sum
+
+        Args:
+            data (pd.DataFrame): dataframe containing the columns 'time' (of type datetime) and 'power' (of type float)
+
+        Returns:
+            int: total energy produced over the entire period in kWh
+        """
+        df=pd.DataFrame()
+        df['time']=pd.to_datetime(data['time'])
+        df['power']=data['power']
+        df['time_gap_hours'] = (df['time'].shift(-1)-df['time']).dt.total_seconds()/3600
+        if len(df.loc[df['time_gap_hours']>1])>0:
+            long_gaps = df.loc[df['time_gap_hours']>1]
+            if len(long_gaps.loc[long_gaps['power']>0])>0:
+                print("There is a long gap in non-zero data. The calculated energy is likely incorrect.")
+        df=df.dropna()
+        df['energy']=df['power']*df['time_gap_hours']
+        return df['energy'].sum()
+    
+    def add_features(self, 
+                     data: pd.DataFrame,
+                     daily_lags=0, 
+                     include_last_year=False, 
+                     days_rolling_average_exact=0, 
+                     todays_lags=0, 
+                     include_month=False,
+                     include_hour = True,
+                     sunlight_duration = False) -> pd.DataFrame:
+        
+        df=data.copy()
+        
+
+        pass
+
+    def n_consecutive_days(self, data: pd.Series, n: int)-> pd.Series:
+        """given a series, list, or dataframe of days, says where you have a list of n consecutive days
+        Note that if you want 14 days train/1 day test, will need n=15
+        Moreover, if need to calculate lags/incorporate past days' info as exogenous variables, will need even larger n
+
+        Args:
+            data (series): must be a list of DAYS
+            n (int): number of consecutive entries we're looking for
+
+        Returns:
+            pd.Series: list of days which END an n-day streak
+        """
+        df = pd.DataFrame()
+        df['day'] = pd.to_datetime(data)
+        df = df.sort_values('day')
+        df['days_between'] = (df['day']-df['day'].shift(1)).dt.days
+        df['days_between_is_1'] = (df['days_between']==1).astype(int)
+        df['streak_n'] = (df['days_between_is_1'] == 1).rolling(n).sum().eq(n)
+        
+        return df.loc[df['streak_n'],'day']
+    
+    def has_one_year_ago(self, data: pd.Series) -> pd.Series:
+        """given a series of dates, returns whether the day one year earlier is in the series.
+        NOTE: one year before Feb 29 will be automatically set to Feb 28
+
+        Args:
+            data (pd.Series): dates mm/dd/yyyy
+
+        Returns:
+            pd.Series: subset of input dates
+        """
+        df = pd.DataFrame()
+        df['day'] = pd.to_datetime(data)
+        #will look up this day but last year in the collection of days
+        #turn into a set, then look up in the set
+        day_set = set(df['day'])
+        df['has_last_year'] = df['day'].apply(lambda x: (x - pd.DateOffset(years=1)) in day_set)
+
+        return df.loc[df['has_last_year'],'day']
