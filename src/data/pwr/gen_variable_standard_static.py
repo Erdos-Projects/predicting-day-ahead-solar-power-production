@@ -230,7 +230,7 @@ def find_aggregate_variable_names_gen_mod(
             if len(relevant_rows_metrics.index) > 1:
                 raise RuntimeError(f'System {system_id} has multiple sensors named {sensor_name}!')
             else:
-                var_aggs_metadata.loc[system_id, metadata_agg_name(var_name)] = True
+                var_aggs_metadata.at[system_id, metadata_agg_name(var_name)] = True
                 ind = relevant_rows_metrics.index[0]
                 metric_id = relevant_rows_metrics.loc[ind, 'metric_id']
                 common_name = relevant_rows_metrics.loc[ind, 'common_name']
@@ -261,7 +261,7 @@ def find_aggregate_variable_names_gen_mod(
                             })
                             # because the last source_fragment is now '',
                             # we get the unknown type for free.
-                            var_aggs_metadata.loc[
+                            var_aggs_metadata.at[
                                 system_id, metadata_agg_subtype_name(var_name, source_type)
                             ] = True
                             # for each particular system_id/sensor_name pair,
@@ -465,7 +465,7 @@ def find_all_variable_names_gen_mod(var_aggs_dict,
         # see if any terms remaining
         num_subparts = relevant_rows_non_agg_metrics.shape[0]
         if num_subparts > 1:  # at least two subparts, keep going!
-            var_parts_metadata.loc[system_id, metadata_part_name(var_name)] = True
+            var_parts_metadata.at[system_id, metadata_part_name(var_name)] = True
             if sources_matter:
                 for j in range(len(known_sources)):
                     source_type = known_sources[j]
@@ -475,7 +475,7 @@ def find_all_variable_names_gen_mod(var_aggs_dict,
                     )
                     num_known_type = var_subparts_known_type.shape[0]
                     if num_known_type > 1:
-                        var_parts_metadata.loc[
+                        var_parts_metadata.at[
                             system_id, metadata_part_subtype_name(var_name, source_type)
                         ] = True
                         var_subparts_known_type = var_subparts_known_type.sort_values('sensor_name')
@@ -518,10 +518,10 @@ def find_all_variable_names_gen_mod(var_aggs_dict,
                         if hard_stop_on_singleton:
                             raise ValueError('Incorrect subpart description, presumably.')
                         else:  # no common prefix, just index 0
-                            var_parts_metadata.loc[
+                            var_parts_metadata.at[
                                 system_id, metadata_agg_subtype_name(var_name, source_type)
                             ] = True
-                            var_parts_metadata.loc[
+                            var_parts_metadata.at[
                                 system_id, metadata_part_subtype_name(var_name, source_type)
                             ] = True
                             only_metric = var_subparts_known_type.iloc[0, :]
@@ -790,7 +790,7 @@ def check_variable_data_exists_single_system(
     '''
     try:
         my_var_names = deepcopy(var_total_dict[system_id])
-        my_var_metadata = var_total_metadata_df.loc[system_id, :]
+        my_var_metadata = var_total_metadata_df.loc[system_id, :].copy(deep=True)
     except KeyError as e:
         print(f'System {system_id} not included in input!')
         raise e
@@ -832,37 +832,37 @@ def check_variable_data_exists_single_system(
             my_var_metadata = None
         # otherwise, redo the affected metadata
         else:
-            my_var_metadata.loc[
+            my_var_metadata.at[
                 metadata_agg_name(var_name)
             ] = False
-            my_var_metadata.loc[
+            my_var_metadata.at[
                 metadata_part_name(var_name)
             ] = False
             if sources_matter:
                 for source_type in known_sources:
-                    my_var_metadata.loc[
+                    my_var_metadata.at[
                         metadata_agg_subtype_name(var_name, source_type)
                     ] = False
-                my_var_metadata.loc[
+                my_var_metadata.at[
                     metadata_part_subtype_name(var_name, source_type)
                 ] = False
             for metric_dict in my_var_names:
                 if metric_dict['whole_or_part'] == 'whole':
-                    my_var_metadata.loc[
+                    my_var_metadata.at[
                         metadata_agg_name(var_name)
                     ] = True
                     if sources_matter:
-                        my_var_metadata.loc[
+                        my_var_metadata.at[
                             metadata_agg_subtype_name(
                                 var_name, metric_dict['source_type']
                             )
                         ] = True
                 elif metric_dict['whole_or_part'] == 'part':
-                    my_var_metadata.loc[
+                    my_var_metadata.at[
                         metadata_part_name(var_name)
                     ] = True
                     if sources_matter:
-                        my_var_metadata.loc[
+                        my_var_metadata.at[
                             metadata_part_subtype_name(
                                 var_name, metric_dict['source_type']
                             )
