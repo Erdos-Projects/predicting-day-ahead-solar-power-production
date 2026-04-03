@@ -51,9 +51,61 @@ class Clean:
                      include_month=False,
                      include_hour = True,
                      sunlight_duration = False) -> pd.DataFrame:
-        
+        """creates the dataframe of features
+
+        Args:
+            data (pd.DataFrame): first column, titled 'time', is times. Second column is 'power' in kW
+            daily_lags (int, optional): number of past days' data at the same . Defaults to 0.
+            include_last_year (bool, optional): _description_. Defaults to False.
+            days_rolling_average_exact (int, optional): _description_. Defaults to 0.
+            todays_lags (int, optional): _description_. Defaults to 0.
+            include_month (bool, optional): _description_. Defaults to False.
+            include_hour (bool, optional): _description_. Defaults to True.
+            sunlight_duration (bool, optional): _description_. Defaults to False.
+
+        Returns:
+            pd.DataFrame: _description_
+        """
         df=data.copy()
+
+        #do daily lags: previous daily_lags days at exactly the same time
+        if daily_lags>0:
+            for i in range(1,daily_lags+1):
+                df_temp = df.copy()
+                df_temp['time'] = df_temp['time'] + pd.Timedelta(days=1)
+                df_temp.rename(columns = {'power':f'daily_lag_{i}'})
+                df = df.merge(df_temp, on='time', how = 'left')
         
+        #if we want to include last year's reading
+        #column title will be 'last_year'
+        if include_last_year:
+            pass
+
+        #days_rolling_average_exact
+        #how many past days' rolling average at this time
+        #if included, column title would be f'{days_rolling_average_exact}_day_rolling_average'
+        if days_rolling_average_exact>0:
+            pass #might be colinear with daily_lags
+
+        #todays_lags
+        if todays_lags>0:
+            for i in range(i,todays_lags+1):
+                df_temp = df.copy()
+                df_temp['power'] = df_temp['power'].shift(1)
+                df_temp.rename(columns = {'power':f'todays_lag_{i}'})
+                df = df.merge(df_temp, on='time', how = 'left')
+
+        if include_month:
+            df['month'] = df['time'].dt.month
+        
+        if include_hour:
+            df['hour'] = df['time'].dt.hour
+
+        if sunlight_duration: #will take some time to code up. column will be titled 'sunlight_duration'
+            pass
+
+
+
 
         pass
 
