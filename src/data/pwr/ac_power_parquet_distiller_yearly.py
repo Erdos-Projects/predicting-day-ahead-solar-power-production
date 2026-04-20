@@ -16,7 +16,7 @@ from tqdm import tqdm
 # start and end index
 # 82 (0-81) in general
 i_start = 0
-i_end = 9
+i_end = 81
 # save as csv or a parquet group?
 save_mode = 'parquet'
 save_folder_csv = '../../../../data_ds_project/testing_yearly_csv/'
