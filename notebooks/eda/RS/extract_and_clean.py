@@ -16,7 +16,7 @@ class Clean:
         """
         self.system_id = system_id
         self.path = path+f'{system_id}/'
-        self.partialpath = path+"/"
+        self.partialpath = path+"/" 
 
     def combine_and_clean(self, locations: list):
         """Combine all the data of a given inverter or meter into 1 dataframe
