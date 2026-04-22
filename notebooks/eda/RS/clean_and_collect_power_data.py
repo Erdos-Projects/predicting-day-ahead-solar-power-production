@@ -8,19 +8,24 @@ from datetime import date, datetime, timedelta
 from itertools import product
 from copy import deepcopy
 from gen_variable_standard_static import metrics_search_for_two_fragments_df
-from tqdm import tqdm
+#from tqdm import tqdm
 
 class Clean:
-    def __init__(self, system_id=0, path="", systems_cleaned=pd.DataFrame()):
+    def __init__(self, system_id=0, path="", systems_cleaned=pd.DataFrame(), meter_or_inverter = None, write_to_path=""):
         """initialize object
 
         Args:
             system_id (int): system id
             path (string): the path UP UNTIL the folder with system id number. DOES include the last /
+            write_to_path (string): the path to where the parquet file with cleaned data should be written. DOES include the last /. No need to include system_id 
+                                    Should have a subfolder for good_days lists (?)
+            meter_or_inverter: if a parquet file, should say whether we're looking for meter or for inverter data.
+                                'meter' or 'inverter'
         """
-        self.system_id = system_id
+        self.system_id = str(system_id)
         self.path = path+f'{system_id}/'
-        self.partialpath = path+"/"
+        self.partialpath = path
+        self.write_to_path = write_to_path+f'{system_id}/'
         self.systems_cleaned = systems_cleaned[systems_cleaned['system_id'] == self.system_id]
         #prize or parquet?
         if self.systems_cleaned.iloc[0]['is_prize_data']:
@@ -29,16 +34,28 @@ class Clean:
             self.prize_or_parquet = 'parquet'
         else:
             self.prize_or_parquet = 'other'
+
+        self.date_summaries = pd.DataFrame() #will be updated in good_days
+        self.good_days_df = pd.DataFrame() #will be updated in good_days
+
+        self.years = sorted([
+                        int(p.name.split('=')[1])
+                        for p in self.path.iterdir()
+                        if p.is_dir() and p.name.startswith('year=')
+                    ]) #list of years there is data for
+        
+        if meter_or_inverter not in ('meter', 'inverter', None):
+            raise ValueError(f'meter_or_inverer, input {meter_or_inverter}, is none of'
+                             + '"meter" or "inverter".')
+        self.meter_or_inverter = meter_or_inverter
+
             
 
-    def standardize_dataframe(self, data: pd.DataFrame, meter_or_inverter: str)-> pd.DataFrame:
+    def standardize_dataframe(self, data: pd.DataFrame)-> pd.DataFrame:
         """NEEDS TESTING returns standardized version of dataframe for input into other functions
 
         Args:
             data (pd.DataFrame): input data; three or four columns
-            meter_or_inverter (str): "meter" or "inverter" -- whether we want meter data or inverter data
-        Raises:
-            ValueError: meter or inverter not properly defined
 
         Returns:
             pd.DataFrame: two-column dataframe: "time" and "power". 'time' entries are of type datetime
@@ -47,18 +64,16 @@ class Clean:
         #figure out column names
         inv_col = data.columns[data.columns.str.contains('inv')][0]
         meter_col = data.columns[data.columns.str.contains('met')][0]
-        if meter_or_inverter == 'meter':
+        if self.meter_or_inverter == 'meter':
             df['time','power'] = data['time',meter_col]
-        elif meter_or_inverter == 'inverter':
+        elif self.meter_or_inverter == 'inverter':
             df['time','power'] = data['time',inv_col]
-        else:
-            raise ValueError(f'meter_or_inverer, input {meter_or_inverter}, is none of'
-                             + '"meter" or "inverter".')
+
         df['time']=pd.to_datetime(df['time'])
         return df
             
 
-    def remove_small_values(self, data: pd.DataFrame, null_or_zero: str, dropna=True)-> pd.DataFrame:
+    def remove_small_values(self, data: pd.DataFrame, null_or_zero = 'null', dropna=True)-> pd.DataFrame:
         """NEEDS TESTING Removes small data values and replaces them with np.nan or with 0
 
         Args:
@@ -103,7 +118,7 @@ class Clean:
         return df
 
 
-    def extract_year_data_parquet(self, years : list) -> pd.DataFrame:
+    def extract_years_data_parquet(self, years : list) -> pd.DataFrame:
         """given a list of years, returns the data from that year in a pandas dataframe.
 
         Args:
@@ -121,6 +136,18 @@ class Clean:
         if len(df)<10:
             return None
         return df
+    
+    def extract_all_years_data_parquet(self, clean = True):
+
+        #get data year by year, clean it, then combine and save
+        for year in self.years:
+            data = self.extract_years_data_parquet([year])
+            data = self.standardize_dataframe(data)
+            data = self.remove_small_values(data)
+
+        #don't want to get all and then clean since it will take more space
+
+        pass
 
 
     def good_days(self, data : pd.DataFrame) -> pd.DataFrame:
@@ -218,14 +245,33 @@ class Clean:
         date_summaries = date_summaries.reset_index()
         date_summaries['date'] = date_summaries['date'].dt.date #in case it was changed in debugging
 
-        self.good_days_df = date_summaries.loc[date_summaries['good_day'],['date']]
-        
-        return self.good_days_df
+        #restrict to the good days only
+        good_days_df = date_summaries.loc[date_summaries['good_day'],['date']]
 
+        #append to global good_days_df, in case this function is run multiple times
+        self.good_days_df = pd.concat([self.good_days_df, good_days_df], ignore_index = True).drop_duplicates().sort_values(by = 'date')
+        #append to global date_summaries
+        self.date_summaries = pd.concat([self.date_summaries, date_summaries], ignore_index = True).drop_duplicates().sort_values(by = 'date')
+        
+        return good_days_df #only the good days in the data set from THIS function run
+
+    def keep_good_days_only(self, data : pd.DataFrame) -> pd.DataFrame:
+        """Given cleaned data, keeps only the good days
+
+        Args:
+            data (pd.DataFrame): cleaned data ('time' | 'power')
+
+        Returns:
+            pd.DataFrame: only the good days in the cleaned data
+        """
+        good_days_set = set(self.good_days(data))
+        df_good = data[data['time'].dt.date.isin(good_days_set)]
+        return df_good
+        
 
     def good_days_streaks(self, streak : int ) -> pd.DataFrame:
         """NEEDS TESTING returns a dataframe containing all good days that end a streak of length at least the inputted streak.
-        NOTE: Must run good_days first.
+        NOTE: Must run good_days first for ALL years!!!
 
         Args:
             streak (int): The number of consecutive days of good data we are seeking
@@ -252,10 +298,89 @@ class Clean:
         pass
 
 
-    def extract_data_until_day(self, day : str) -> pd.DataFrame:
+    def extract_data_until_day(self, end_day : str, cleaned = True) -> pd.DataFrame:
         
+        day = pd.to_datetime(end_day, format = '%m/%d/%Y').date() #make it a datetime type and restrict to date
+        cutoff = day.year
+
         #if parquet
+        years_subset = [y for y in self.years if y <= cutoff]
 
         #if prize
+
         pass
     
+    def convert_to_energy_LRS(self, data : pd.DataFrame) -> pd.DataFrame:
+        """Turn cleaned data into hour-by-hour energy using a left Riemann sum 
+
+        Args:
+            data (pd.DataFrame): cleaned data
+
+        Returns:
+            pd.DataFrame: hourly energy
+        """
+
+        df = data.copy()
+        df = df.sort_values('time')
+        df['day'] = df['time'].dt.floor('D')
+
+        # within a day, find difference between this time and the next
+        df['delta_t'] = (df.groupby('day')['time']
+            .shift(-1) - df['time'])
+        df['delta_t'] = df['delta_t'].dt.total_seconds() / 3600   # convert to hours
+
+        # create a map to find modes for day
+        date_summaries = self.date_summaries.copy()
+        mode_map = date_summaries.set_index('date')['delta_t_mode']
+
+        # fill the last entry with the mode (likely best simple estimate we have)
+        df['delta_t'] = df['delta_t'].fillna(df['day'].map(mode_map))
+
+        df['energy'] = df['power']*df['delta_t']
+
+        # now sort by hour and find hourly sum to get total energy in kwh
+        df['hour'] = df['time'].dt.floor('H')
+        hourly = df.groupby('hour', as_index=False)['energy'].sum()
+        hourly.rename(columns={'hour': 'time'})
+
+        return hourly
+    
+    def clean_all_and_write_to_file(self):
+        """cleans data and writes it to file.
+        All files become parquets.
+        If the data was originally parquet, data remains partitioned by year.
+
+        In the future, if the data was originally prize, data will not be partitioned.
+        """
+        
+        #extract data -- done differently for parquet vs prize
+        if self.prize_or_parquet == 'parquet':
+            #go through year-by-year
+            for year in self.years:
+                # lots of cleaning
+                data = self.extract_years_data_parquet([year])
+                data = self.standardize_dataframe(data)
+                data = self.remove_small_values(data)
+                data = self.keep_good_days_only(data)
+                data = self.convert_to_energy_LRS(data)
+                # write to file
+                # make sure location exists
+                out_dir = Path(self.write_to_path) / str(self.system_id) / f"year={year}"
+                out_dir.mkdir(parents=True, exist_ok=True)
+                # write to file
+                data.to_parquet(out_dir,
+                                engine="pyarrow",
+                                index=False)
+            #make csv for good_days
+            #make sure location exists
+            out_dir = Path(self.write_to_path) / "good_days"
+            out_dir.mkdir(parents=True, exist_ok=True)
+            #make file
+            self.good_days.to_csv(f'{self.write_to_path}good_days/{self.system_id}_good_days.csv', index=False)
+        
+        elif self.prize_or_parquet == 'prize':
+            pass
+        else:
+            pass
+
+        pass
