@@ -1,67 +1,67 @@
-# spring-2026-solar-panel-degradation-team-2
-Project completed for Erdos institute data science bootcamp (fall-2025)
+# predicting-day-ahead-solar-power-production
+
+
+Project completed for Erdos institute Data Science Bootcamp (spring-2026)
+
 
 ### Team members
+
+
 1. [Roberta Shapiro](https://github.com/ShapiroRH)
 2. [Charles Baker](https://github.com/ch83baker)
 3. [William Grodzicki](https://github.com/wpgrodzicki)
 
+
 ### Acknowledgment
-We give thanks for the assistance of [Alex Myers](https://github.com/MyersAlex924), who as a founding team member helped us find the Open-Meteo satellite data, among other contributions in the early stage of the project.
+
+
+We give thanks for the assistance of [Alex Myers](https://github.com/MyersAlex924), who as a founding team member helped us find the [Open-Meteo historical weather-satellite data](https://open-meteo.com/en/docs/historical-weather-api), among other contributions in the early stage of the project.
+
 
 ## Project overview
-We hope to develop tools for analyzing and predicting photovoltaic-cell degradation in solar panels using location, meteorological data, and installation type
+
+
+We hope to develop tools for predicting hourly solar energy production, for use in the day-ahead energy market.
+
 
 ## Motivation and problem statement
-Solar power is a growing portion of energy production in the United States and will likely continue to play a significant role for the foreseeable future. As such, it is important to understand and be able to predict the long term state of solar farms, in order to plan for future growth, replacement, and maintenance.
 
-In this project we seek to answer the following question: “Can we use meteorological data and patterns to predict future degradation of solar cells?”
+
+Solar power is a growing portion of global energy production and is expected to play a significant role for the foreseeable future. 
+To participate in energy markets, power producers must submit day-ahead bids specifying the amount of energy they expect to supply each hour the following day. (See, for example, [PJM Day-Ahead Market Information (2015 edition)](m11v72-energy-ancillary-services-market-ops.pdf).) These bids are based on forecasts that combine historical power production and predicted future environmental conditions.
+
+
+We address this problem by modeling energy production using past energy production and meteorological data as inputs predicting hour-by-hour the power production for tomorrow without relying on same-day observations, which are not available at the time the bids are made.
+
 
 ## Stakeholders
-Our primary stakeholders are companies and governments that are planning to construct and/or maintain solar farms, as this project aims to predict their long term health and performance.
+
+
+Our primary stakeholders are established organizations that produce energy to sell on the market.
+
 
 ## Dataset
 
-Our initial EDA was from the 2022 "Photovoltaic Fleet Degradation Insights" dataset. [Data](https://datahub.duramat.org/dataset/photovoltaic-fleet-degradation-insights-data) [Metadata](https://datahub.duramat.org/dataset/metadata/photovoltaic-fleet-degradation-insights-data), which, although it only records very vague location data, gives a good sense of what can be done with [RdTools](https://www.nlr.gov/pv/rdtools), one of our principal packages.
 
-As most Duramat data appears to be limited to members of authorized teams, our primary dataset is the [Open Energy Data Initiative (OEDI) Photovoltaic Data Acquisition (PVDAQ) Public Datasets](https://data.openei.org/submissions/4568).  See the [Data Collection Strategy Document](data_collection_strategy.md) for more of a sense of the data.  
+Our primary dataset for power production is the [Open Energy Data Initiative (OEDI) Photovoltaic Data Acquisition (PVDAQ) Public Datasets](https://data.openei.org/submissions/4568).  The relevant sub-data-sets are the [2023 Solar Prize Data](https://data.openei.org/s3_viewer?bucket=oedi-data-lake&prefix=pvdaq%2F2023-solar-data-prize%2F), containing rich data from 5 systems (4 usable), and the [PVDAQ General Collection](https://data.openei.org/s3_viewer?bucket=oedi-data-lake&prefix=pvdaq%2Fparquet%2F), a collection of 155 photovoltaic systems from the United States and India (82 usable).
 
-As an aside, we note that most installations in the sub-group [PVDAQ Public Data Lake - CSV](https://data.openei.org/s3_viewer?bucket=oedi-data-lake&prefix=pvdaq%2Fcsv%2F) collect AC power/current/voltage data and nothing else.  This is not enough to use RdTools.  
 
-Our predictive features include latitude, longitude, ZIP, meteorological data, and type of installation
+Our primary dataset for daylight and sunlight hours is the [Open-Meteo historical weather-satellite data](https://open-meteo.com/en/docs/historical-weather-api), with hourly increment.
+
+
+Our primary dataset for irradiance is the NSRDB GOES-aggregated-v4 data, 1998-2024, with hourly or half-hourly increment.  See [NSRDB Satellites, General Info](https://nsrdb.nlr.gov/about/what-is-the-nsrdb) for general information, or [GOES-Aggregated-v4](https://developer.nlr.gov/docs/solar/nsrdb/nsrdb-GOES-aggregated-v4-0-0-download/) for more granular information.  For ease of access, we use the [pvlib Python Package](https://pvlib-python.readthedocs.io/en/stable/index.html) accessors to access the data in a convenient way.  
+
+
+In a similar way, we use the NSRDB GOES TMY (typical meteorological year) to find the “typical” data for a year.  See [GOES TMY](https://developer.nlr.gov/docs/solar/nsrdb/nsrdb-GOES-tmy-v4-0-0-download/) for more detailed information. 
+
+
+
 
 ### Complication -- size of documents
-Although the CSV Data Lake is not relvant for this study, the [2023 Solar Data Prize dataset](https://data.openei.org/s3_viewer?bucket=oedi-data-lake&prefix=pvdaq%2F2023-solar-data-prize%2F) is 450.54 GB of csv files, although we only need some of the data and we can parquet-save it to save on space.
+The raw data is too large to fit in the GitHub.  For example, we need almost 10 GB of data from the [2023 Solar Data Prize dataset](https://data.openei.org/s3_viewer?bucket=oedi-data-lake&prefix=pvdaq%2F2023-solar-data-prize%2F) and 17.1 GB from the [PVDAQ Public Data Lake - Parquet](https://data.openei.org/s3_viewer?bucket=oedi-data-lake&prefix=pvdaq%2Fparquet%2F) collection.  Hence, although most of the metadata is able to be stored in the GitHub folder, the bulk of the data is stored in the `data_ds_project` folder, a local-storage folder at the same level as the GitHub folder.
 
-The [PVDAQ Public Data Lake - Parquet](https://data.openei.org/s3_viewer?bucket=oedi-data-lake&prefix=pvdaq%2Fparquet%2F) collection, however, is around 17.5 GB of data.  Even restricting to the data we think we need, it is over 10 GB.  
+
 
 
 ## Modeling approach
-Our modeling assumption is more-or-less Degradation (estimated) = f(Site), where site data includes location (latitude, longitude), meteorological data (both locally recorded and the [NSRDB satellite data](https://nsrdb.nrel.gov/)), the type of materials in the solar cell, and the database data on Power generation, Ambient or Module Temperature, and something called [irradiance](https://en.wikipedia.org/wiki/Irradiance).  
-
-### Getting the degradation estimates via RdTools
-Actually getting estimates of our response variable, degradation, is a nontrivial amount of work.  The steps are as follows, as adapted from https://rdtools.readthedocs.io/en/stable/examples/degradation_and_soiling_example.html.
-
-1.  Load in the metadata for each site.
-2.  Either load in the existing module temperature, or use [pvlib](https://rdtools.readthedocs.io/en/stable/examples/degradation_and_soiling_example.html) with the ambient-temperature records to simulate the module temperature.
-3.  Load in the power-generation and irradiance data.
-4.  Use pvlib again to get a normalized power estimate.
-5.  Filter out some noise in the data.
-6.  Aggregate the irradiance data per day with a weighted average.  (Because start-of-day and end-of-day measurements are very noisy.)
-7.  More filtering.
-8.  Get degradation estimate.
-9.  Correct for any soiling.  If the panel has accumulated dust on top, and it gets cleaned off all at once, we need to correct for the spike in power.
-
-### Stretch goal -- PVDeg as a stronger competitor than DummyRegressor.
-The [PVDeg](https://pvdegradationtools.readthedocs.io/en/latest/#) package is also relevant to our analysis.  It is purely simulated data, but it has some strong numerical-methods behind it.  (I seem to recall the phrase, "finite-element analysis", being tossed around.)
-
-Basically, the workflow there is:
-1.  Input the location and the type of solar panel.
-2.  Grab the NSRDB weather data.
-3.  Choose which diferential equation model (out of the pre-built models) to use to model degradation.
-4.  Compute the Monte Carlo simulations -- for one location on a local computer, for many locations via a Google Colab system to access the stronger computer power.
-
-See (89537.pdf) for an accessible overview.
-
-We are not quite certain that we can use it, but if we can, it would be interesting to compare our careful statistical work to these quick estimates, to see if we do better or worse with all of that historical data. 
-
+Our modeling assumption is that Power (estimated) is a function of site data and previous Power values. Site data includes Sunlight Duration, Irradiance (https://en.wikipedia.org/wiki/Irradiance), whether the panels are fixed or tracking, the tilt and azimuth of the panels if fixed (for angle-of-incidence reasons). (f. Previous Power incorporates daily and annual lags). Since we are only predicting a day ahead, and as historical forecast data is not generally available for our data sets, we use the actual meteorological data as a proxy, with the caveat that this would tend to make our model a little too accurate. We note that day-ahead forecasts are considered to be approximately 95% accurate.
