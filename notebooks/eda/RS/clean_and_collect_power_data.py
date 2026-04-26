@@ -45,8 +45,7 @@ class Clean:
                     ]) #list of years there is data for
         
         if meter_or_inverter not in ('meter', 'inverter', None):
-            raise ValueError(f'meter_or_inverer, input {meter_or_inverter}, is none of'
-                             + '"meter" or "inverter".')
+            raise ValueError(f'meter_or_inverer, input {meter_or_inverter}, is none of "meter" or "inverter", or None.')
         self.meter_or_inverter = meter_or_inverter
 
             
@@ -226,11 +225,14 @@ class Clean:
         # print(df['delta_t_hours'].isna().sum())
         # print(df['delta_t_mode']) 
         # print(df['delta_t_mode'].isna().sum())
-
+        print(df['delta_t_hours'].dtype)
         # one entry each day will not have a delta_t_hours put in -- replace na with delta_t_mode
         df['delta_t_hours'] = df['delta_t_hours'].fillna(df['delta_t_mode'])
+        df.dropna(inplace=True) #to ensure that there are no na values, which would mess up the comparison. This will drop days with only one reading.
 
         #compare delta_t_hours with delta_t_mode
+        print(df['delta_t_mode'].dtype)
+        print(df['delta_t_hours'].dtype)
         gap_flag = (df['delta_t_hours'] > 1.02 * df['delta_t_mode']).groupby(df['date']).any()
 
         #merge with date_summaries
@@ -442,13 +444,14 @@ class Clean:
                 # data.to_parquet(out_dir,
                 #                 engine="pyarrow",
                 #                 index=False)
-            #make csv for good_days
-            #make sure location exists
-            out_dir = Path(self.write_to_path) / "good_days"
-            out_dir.mkdir(parents=True, exist_ok=True)
-            #make file
-            file_path = out_dir / f"{self.system_id}_good_days_{self.meter_or_inverter}.csv"
-            self.good_days_df.to_csv(file_path, index=False)
+            if len(self.good_days_df) > 200: #otherwise, there's basically no point in doing this
+                #make csv for good_days
+                #make sure location exists
+                out_dir = Path(self.write_to_path) / "good_days"
+                out_dir.mkdir(parents=True, exist_ok=True)
+                #make file
+                file_path = out_dir / f"{self.system_id}_good_days_{self.meter_or_inverter}.csv"
+                self.good_days_df.to_csv(file_path, index=False)
 
         elif self.prize_or_parquet == 'prize':
             pass
