@@ -63,7 +63,7 @@ class Clean:
         print("\tbeginning standardize_dataframe")
         print(data)
         df = pd.DataFrame()
-        if len(data) <10 or data is None:
+        if data is None or len(data) <10:
             print("\t\tlength too short or is empty -- returning length 0 df")
             print(data)
             return pd.DataFrame(columns=['time', 'power'])
@@ -88,7 +88,7 @@ class Clean:
             df = data[['time',inv_col]].copy()
             print(df)
             df = df.rename(columns={inv_col: 'power'})
-        elif self.meter_or_inverter == None:
+        elif self.meter_or_inverter is None:
             #need column name that contains 'power' but NOT 'inv' or 'met'
             power_cols = data.columns[data.columns.str.contains('power', case=False, na=False)
                                     & ~data.columns.str.contains('inv|met', case=False, na=False)]
@@ -201,7 +201,7 @@ class Clean:
         #create new dataframe that will summarize the goodness of the data each day
         date_summaries = df.groupby(df['date']).agg(
             num_readings=('date', 'size'),
-            delta_t_mode=('delta_t_hours', lambda x: x.mode().iloc[0] if not x.mode().empty else pd.NaT)
+            delta_t_mode=('delta_t_hours', lambda x: x.mode().iloc[0] if not x.mode().empty else np.nan)
         ).reset_index(names='date')
             #current columns: date, num_readings, delta_t_mode
 
@@ -221,20 +221,19 @@ class Clean:
             #create series of Boolean (whether is a large gap)
             #for each day, assign True (if exists large gap) or False (if not)
             #then make into a series
-        # print(df['delta_t_hours']) 
-        # print(df['delta_t_hours'].isna().sum())
-        # print(df['delta_t_mode']) 
-        # print(df['delta_t_mode'].isna().sum())
+
         print(df['delta_t_hours'].dtype)
         # one entry each day will not have a delta_t_hours put in -- replace na with delta_t_mode
         df['delta_t_hours'] = df['delta_t_hours'].fillna(df['delta_t_mode'])
         df.dropna(inplace=True) #to ensure that there are no na values, which would mess up the comparison. This will drop days with only one reading.
 
         #compare delta_t_hours with delta_t_mode
-        print(df['delta_t_mode'].dtype)
-        print(df['delta_t_hours'].dtype)
-        gap_flag = (df['delta_t_hours'] > 1.02 * df['delta_t_mode']).groupby(df['date']).any()
+        print(f"delta_t_mode data type = {df['delta_t_mode'].dtype}")
+        print(f"delta_t_hours data type post-interpolation = {df['delta_t_hours'].dtype}")
+        
 
+        gap_flag = (df['delta_t_hours'] > 1.02 * df['delta_t_mode']).groupby(df['date']).any().astype(bool)
+        
         #merge with date_summaries
         date_summaries = date_summaries.merge(
             gap_flag.rename('has_large_gap'),
@@ -268,7 +267,8 @@ class Clean:
             #current columns: date, num_readings, delta_t_mode, has_large_gap, good_span
 
         #create series for each condition 
-        cond_no_large_gap = ~date_summaries['has_large_gap']
+        cond_no_large_gap = date_summaries.apply(lambda row: False if (row['has_large_gap'] is np.nan) else ~row['has_large_gap'],
+                                                axis=1)
 
         cond_enough_readings = (
             date_summaries['num_readings'] >= 4 / date_summaries['delta_t_mode']
@@ -415,6 +415,8 @@ class Clean:
                 if len(data)==0:
                     continue
                 data = self.remove_small_values(data)
+                if data is None or len(data)<10:
+                    continue
                 data = self.keep_good_days_only(data)
                 data = self.convert_to_energy_LRS(data)
                 if len(data)==0:
