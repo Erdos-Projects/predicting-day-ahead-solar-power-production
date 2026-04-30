@@ -9,13 +9,14 @@ from itertools import product
 from copy import deepcopy
 
 class PreRun:
-    def __init__(self, path="", system_id=0, meter_or_inverter=None):
+    def __init__(self, path="", system_id=0, meter_or_inverter=None, systems_cleaned=None):
         """creates a PreRun object that can be used to load and filter data for a given system_id and meter_or_inverter
 
         Args:
             path (str, optional): path to the folder containing the folders good_days, inverter, meter, other. Defaults to "".
             system_id (int, optional): system_id. Defaults to 0.
             meter_or_inverter (str, optional): 'meter', 'inverter', or 'other' (None). Defaults to None.
+            systems_cleaned (pd.DataFrame, optional): the systems_cleaned dataframe. Defaults to None.
 
         Raises:
             ValueError: something else typed for meter_or_inverter
@@ -34,6 +35,28 @@ class PreRun:
         self.good_days = pd.read_csv(path_good_days) if path_good_days.exists() else None
 
         self.end_days = None
+        self.amended_data = self.data
+
+        # figure out timezone stuff
+        self.systems_cleaned = systems_cleaned[str(systems_cleaned['system_id'])==self.system_id] if systems_cleaned is not None else None
+        timezone_or_utc_offset = self.systems_cleaned['timezone_or_utc_offset'].iloc[0] if self.systems_cleaned is not None else None
+        self.is_offset = self.looks_like_int(timezone_or_utc_offset)
+        # convert to utc_offset
+        if self.looks_like_int(timezone_or_utc_offset):
+            self.utc_offset = int(timezone_or_utc_offset)
+        else:
+            # convert timezone to utc_offset
+            if timezone_or_utc_offset == 'America/New_York':
+                self.utc_offset = -5
+            else:
+                raise ValueError(f"Timezone {timezone_or_utc_offset} not recognized.")
+        
+
+    def looks_like_int(x):
+        try:
+            return float(x).is_integer()
+        except (TypeError, ValueError):
+            return False
 
     def load_data(self):
         """loads all data from the parquet files in the directory into a single pandas DataFrame and stores it in self.data
@@ -53,6 +76,7 @@ class PreRun:
         
         self.data = pd.concat(data_frames, ignore_index=True)
         self.data['time'] = pd.to_datetime(self.data['time'])
+        self.amended_data = self.data.copy()
 
     def filter_good_days(self):
         """filters self.data to only include rows where the date is in self.good_days and stores the result in self.data
@@ -92,6 +116,21 @@ class PreRun:
 
         return end_days
     
+    def fix_timezones(self):
+        #want to change everything to GMT offset 
+        #find original timezone using systems_cleaned
+        if self.is_offset:
+            return
+        else:
+            #convert timezone to utc_offset
+            #make sure time is in localized format; this will be the actual time zone
+            if self.systems_cleaned['timezone_or_utc_offset'].iloc[0] == 'America/New_York':
+                self.data['time'] = self.data['time'].dt.tz_localize('America/New_York')
+            #then convert
+            self.data['time'] = self.data['time'].dt.tz_convert(f'Etc/GMT{self.utc_offset:+d}')
+        
+        self.amended_data = self.data.copy()
+                
     def naive_tts_dates_only(self, train = 0.8)->tuple[pd.DataFrame, pd.DataFrame]:
         """returns a DataFrame with the train and test split of the good end days based on the date only. The train set will contain the first 80% of the good end days and the test set will contain the last 20% of the good end days.
 
@@ -136,6 +175,7 @@ class PreRun:
                      include_day_of_month=False,
                      include_hour = False) -> pd.DataFrame:
         """creates the dataframe of features
+        NOTE: DAYLIGHT SAVINGS!!!! last_year, daily_lags
 
         Args:
             data (pd.DataFrame): first column, titled 'time', is times. Second column is 'power' in kW
@@ -152,7 +192,7 @@ class PreRun:
             sunlight_duration (bool, optional): _description_. Defaults to False.
 
         Returns:
-            pd.DataFrame: _description_
+            pd.DataFrame: dataframe with all added features
         """
         df=self.data.copy()
         df['time'] = pd.to_datetime(df['time'])
@@ -219,7 +259,77 @@ class PreRun:
         return df
 
     def add_weather_features_only(self):
-        pass
+        """adds weather features (cloud cover proportion and global tilted irradiance)
+        """
+        #get weather data
+        weather_data = self.gather_weather_data()
+        #merge with power data
+        df = self.amended_data.copy()
+        df = df.merge(weather_data, left_on='time', right_on='time', how='left')
+        df.dropna(inplace=True)
+        self.amended_data = df
 
-    def add_physics_features_only(self):
-        pass
+
+    def gather_weather_data(self):
+        latitude = self.systems_cleaned['latitude'].iloc[0]
+        longitude = self.systems_cleaned['longitude'].iloc[0]
+        tilt = self.systems_cleaned['tilt'].iloc[0]
+        azimuth = self.systems_cleaned['azimuth'].iloc[0]
+        start_date = self.good_days['date'].min()
+        end_date = self.good_days['date'].max()
+        
+        # Setup the Open-Meteo API client with cache and retry on error
+        cache_session = requests_cache.CachedSession('.cache', expire_after = -1)
+        retry_session = retry(cache_session, retries = 5, backoff_factor = 0.2)
+        openmeteo = openmeteo_requests.Client(session = retry_session)
+
+        # Make sure all required weather variables are listed here
+        # The order of variables in hourly or daily is important to assign them correctly below
+        url = "https://archive-api.open-meteo.com/v1/archive"
+        params = {
+            "latitude": latitude,
+            "longitude": longitude,
+            "start_date": start_date,
+            "end_date": end_date,
+            "hourly": ["cloud_cover", "global_tilted_irradiance"],
+            "timezone": "GMT",
+            "tilt": tilt,
+	        "azimuth": azimuth,
+        }
+        responses = openmeteo.weather_api(url, params = params)
+
+        # Process first location. Add a for-loop for multiple locations or weather models
+        response = responses[0]
+        print(f"Coordinates: {response.Latitude()}°N {response.Longitude()}°E")
+        print(f"Elevation: {response.Elevation()} m asl")
+        print(f"Timezone: {response.Timezone()}{response.TimezoneAbbreviation()}")
+        print(f"Timezone difference to GMT+0: {response.UtcOffsetSeconds()}s")
+
+        # Process hourly data. The order of variables needs to be the same as requested.
+        hourly = response.Hourly()
+        hourly_cloud_cover = hourly.Variables(0).ValuesAsNumpy()
+        hourly_global_tilted_irradiance = hourly.Variables(1).ValuesAsNumpy()
+
+        hourly_data = {"time": pd.date_range(
+            start = pd.to_datetime(hourly.Time(), unit = "s", utc = True),
+            end =  pd.to_datetime(hourly.TimeEnd(), unit = "s", utc = True),
+            freq = pd.Timedelta(seconds = hourly.Interval()),
+            inclusive = "left"
+        )}
+
+        hourly_data["cloud_cover"] = hourly_cloud_cover
+        hourly_data["global_tilted_irradiance"] = hourly_global_tilted_irradiance
+
+        hourly_dataframe = pd.DataFrame(data = hourly_data)
+
+        # make sure cloud cover is between 0 and 1
+        if hourly_dataframe['cloud_cover'].max() > 1:
+            hourly_dataframe['cloud_cover'] = hourly_dataframe['cloud_cover']/100
+
+        # need to shift the time by the utc offset
+        hourly_dataframe['time'] = hourly_dataframe['time'].dt.tz_convert(f'Etc/GMT{self.utc_offset:+d}')
+        #will want weather data to match power data in terms of timezone
+        #remove the utc offset information and have naive timestamps. Note DST is not accounted for here, but we are using the same timestamps for power and weather data so it should be consistent.
+        hourly_dataframe["time"] = hourly_dataframe["time"].dt.tz_localize(None)
+        
+        return hourly_dataframe
