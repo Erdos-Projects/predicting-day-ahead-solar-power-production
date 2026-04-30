@@ -35,6 +35,7 @@ class PreRun:
         self.good_days = pd.read_csv(path_good_days) if path_good_days.exists() else None
 
         self.end_days = None
+        self.end_days_naive = None
         self.amended_data = self.data
 
         # figure out timezone stuff
@@ -50,7 +51,6 @@ class PreRun:
                 self.utc_offset = -5
             else:
                 raise ValueError(f"Timezone {timezone_or_utc_offset} not recognized.")
-        
 
     def looks_like_int(x):
         try:
@@ -78,24 +78,22 @@ class PreRun:
         self.data['time'] = pd.to_datetime(self.data['time'])
         self.amended_data = self.data.copy()
 
-    def filter_good_days(self):
-        """filters self.data to only include rows where the date is in self.good_days and stores the result in self.data
-
-        Raises:
-            ValueError: self.good_days is None
-        """
-        if self.good_days is None:
-            raise ValueError("good_days is not loaded. Please load good_days before filtering.")
+    def fix_timezones(self):
+        #want to change everything to GMT offset 
+        #find original timezone using systems_cleaned
+        if self.is_offset:
+            return
+        else:
+            #convert timezone to utc_offset
+            #make sure time is in localized format; this will be the actual time zone
+            if self.systems_cleaned['timezone_or_utc_offset'].iloc[0] == 'America/New_York':
+                self.data['time'] = self.data['time'].dt.tz_localize('America/New_York')
+            #then convert
+            self.data['time'] = self.data['time'].dt.tz_convert(f'Etc/GMT{self.utc_offset:+d}')
         
-        # Ensure 'date' column is in datetime format
-        self.data['date'] = pd.to_datetime(self.data['date'])
-        self.good_days['date'] = pd.to_datetime(self.good_days['date'])
-        
-        # Filter data to only include rows where the date is in good_days
-        good_dates = set(self.good_days['date'])
-        self.data = self.data[self.data['date'].isin(good_dates)].reset_index(drop=True)
+        self.amended_data = self.data.copy()
 
-    def good_end_days(self, streak: int) -> pd.DataFrame:
+    def good_end_days_naive(self, streak: int) -> pd.DataFrame:
         """returns a DataFrame of the last day of each streak of good days of length >= streak.
 
         Args:
@@ -112,24 +110,9 @@ class PreRun:
         streaks = self.good_days.groupby('streak_id').filter(lambda x: len(x) >= streak)
         end_days = streaks.groupby('streak_id').last().reset_index(drop=True)
         
-        self.end_days = end_days
+        self.end_days_naive = end_days
 
         return end_days
-    
-    def fix_timezones(self):
-        #want to change everything to GMT offset 
-        #find original timezone using systems_cleaned
-        if self.is_offset:
-            return
-        else:
-            #convert timezone to utc_offset
-            #make sure time is in localized format; this will be the actual time zone
-            if self.systems_cleaned['timezone_or_utc_offset'].iloc[0] == 'America/New_York':
-                self.data['time'] = self.data['time'].dt.tz_localize('America/New_York')
-            #then convert
-            self.data['time'] = self.data['time'].dt.tz_convert(f'Etc/GMT{self.utc_offset:+d}')
-        
-        self.amended_data = self.data.copy()
                 
     def naive_tts_dates_only(self, train = 0.8)->tuple[pd.DataFrame, pd.DataFrame]:
         """returns a DataFrame with the train and test split of the good end days based on the date only. The train set will contain the first 80% of the good end days and the test set will contain the last 20% of the good end days.
@@ -140,7 +123,7 @@ class PreRun:
         Returns:
             tuple[pd.DataFrame, pd.DataFrame]: A tuple containing the train and test dates in DataFrames
         """
-        if self.end_days is None:
+        if self.end_days_naive is None:
             raise ValueError("end_days is not calculated. Please calculate good end days before splitting into train and test.")
         
         self.end_days = self.end_days.sort_values('date').reset_index(drop=True)
@@ -150,7 +133,7 @@ class PreRun:
         return train_dates, test_dates
     
     def data_until_ho_day(self, ho_day: pd.Timestamp) -> pd.DataFrame:
-        """returns a DataFrame of all data until the given ho_day (inclusive)
+        """returns a DataFrame of all data (updated to include features) until the given ho_day (inclusive)
 
         Args:
             ho_day (pd.Timestamp): the day to filter the data until
@@ -161,7 +144,7 @@ class PreRun:
         if self.data is None:
             raise ValueError("data is not loaded. Please load data before filtering by ho_day.")
         
-        filtered_data = self.data[self.data['date'] <= ho_day].reset_index(drop=True)
+        filtered_data = self.amended_data[self.amended_data['date'] <= ho_day].reset_index(drop=True)
         return filtered_data
     
     def add_power_features_only(self, 
@@ -268,7 +251,6 @@ class PreRun:
         df = df.merge(weather_data, left_on='time', right_on='time', how='left')
         df.dropna(inplace=True)
         self.amended_data = df
-
 
     def gather_weather_data(self):
         latitude = self.systems_cleaned['latitude'].iloc[0]
