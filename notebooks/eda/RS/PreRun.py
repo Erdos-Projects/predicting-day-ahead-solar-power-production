@@ -267,6 +267,9 @@ class PreRun:
         #update good_days to only include days where we have all the features 
         self.good_days = df['day'].drop_duplicates().reset_index(drop=True).to_frame().rename(columns={'day':'date'})
 
+        #remove 'day' column from amended_data
+        self.amended_data = self.amended_data.drop(columns=['day'])
+        
         return df
 
     def add_weather_features_only(self):
