@@ -13,6 +13,17 @@ import requests_cache
 from retry_requests import retry
 import openmeteo_requests
 
+# Order to do things in:
+# 1. Create PreRun object with system_id, path, meter_or_inverter, and systems_cleaned
+# 2. add_energy_features_only
+# 3. add_weather_features_only
+# (can swap 2 and 3)
+# The dataframe as a whole with ALL selected features is stored in self.amended_data, the original data in self.data
+# 4. good_end_days_naive
+# 5. naive_tts_dates_only <- to get naive train/test split
+# 6. data_until_ho_day <- to get all data until a given ho_day 
+
+
 
 class PreRun:
     def __init__(self, system_id=0, path="",  meter_or_inverter=None, systems_cleaned=None):
