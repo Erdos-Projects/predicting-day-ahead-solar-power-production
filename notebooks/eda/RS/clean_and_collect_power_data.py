@@ -60,12 +60,12 @@ class Clean:
         Returns:
             pd.DataFrame: two-column dataframe: "time" and "power". 'time' entries are of type datetime
         """
-        print("\tbeginning standardize_dataframe")
-        print(data)
+        #print("\tbeginning standardize_dataframe")
+        #print(data)
         df = pd.DataFrame()
         if data is None or len(data) <10:
-            print("\t\tlength too short or is empty -- returning length 0 df")
-            print(data)
+            # print("\t\tlength too short or is empty -- returning length 0 df")
+            # print(data)
             return pd.DataFrame(columns=['time', 'power'])
         #figure out column names
         #only need the column corresponding to meter, inverter, or neither meter nor inverter
@@ -78,15 +78,15 @@ class Clean:
             df = data[['time',meter_col]].copy()
             df = df.rename(columns={meter_col: 'power'})
         elif self.meter_or_inverter == 'inverter':
-            print("\t\tentered meter_or_inverter == inverter")
+            # print("\t\tentered meter_or_inverter == inverter")
             col_names = data.columns[data.columns.str.contains('inv', na=False)]
-            print(f"       col_names = {col_names}")
+            # print(f"       col_names = {col_names}")
             #if empty, then we need to skip this whole shindig
             if len(col_names)==0:
                 return pd.DataFrame(columns=['time', 'power'])
             inv_col = col_names[0]
             df = data[['time',inv_col]].copy()
-            print(df)
+            # print(df)
             df = df.rename(columns={inv_col: 'power'})
         elif self.meter_or_inverter is None:
             #need column name that contains 'power' but NOT 'inv' or 'met'
@@ -100,7 +100,7 @@ class Clean:
 
         df['time']=pd.to_datetime(df['time'])
         df = df.dropna() #to get rid of extra rows
-        print(df)
+        # print(df)
         return df
             
 
@@ -120,7 +120,7 @@ class Clean:
         Returns:
             pd.DataFrame: cleaned dataframe
         """
-        print("\tbeginning remove_small_values")
+        # print("\tbeginning remove_small_values")
         df = data.copy()
         if len(df)==0:
             return df
@@ -131,17 +131,17 @@ class Clean:
             # first_index = self.systems_cleaned.index[0]
             # max_dc_capacity = self.systems_cleaned.loc[first_index, 'dc_capacity_kW']
         max_dc_capacity = self.systems_cleaned.iloc[0]['dc_capacity_kW']
-        print(f"\t\t max_dc_capacity = {max_dc_capacity}")
+        # print(f"\t\t max_dc_capacity = {max_dc_capacity}")
         # maximum of power readings
         local_max = df['power'].max()
         # use the smaller of these
         smaller_max = max(min(max_dc_capacity, local_max),0)
-        print(f"       smaller_max = {smaller_max}")
+        # print(f"       smaller_max = {smaller_max}")
 
         if(null_or_zero == 'zero'):
             df.loc[df['power']<0.01*smaller_max,'power'] = 0
         elif(null_or_zero == 'null'):
-            print("\t\t in elif null_or_zero == null")
+            # print("\t\t in elif null_or_zero == null")
             df.loc[df['power']<0.01*smaller_max,'power'] = np.nan
         else:
             raise ValueError(f'null_or_zero, input {null_or_zero}, is none of'
@@ -162,7 +162,7 @@ class Clean:
         Returns:
             pd.DataFrame: data from the extracted years, as a dataframe
         """
-        print("\t now beginning extract_years_data_parquet")
+        # print("\t now beginning extract_years_data_parquet")
         folder = Path(self.path)
         requested_pq = pq.ParquetDataset(
             folder,
@@ -187,7 +187,7 @@ class Clean:
         Returns:
             pd.Series: a series of all good days
         """
-        print('\tbeginning good_days')
+        # # print('\tbeginning good_days')
         # NOTE: IF THERE IS AN ERROR, TRY MAKING df['date'] be df['time'].dt.floor('D') 
         # apparently this type might wok better for rolling windows
 
@@ -222,14 +222,14 @@ class Clean:
             #for each day, assign True (if exists large gap) or False (if not)
             #then make into a series
 
-        print(df['delta_t_hours'].dtype)
+        # print(df['delta_t_hours'].dtype)
         # one entry each day will not have a delta_t_hours put in -- replace na with delta_t_mode
         df['delta_t_hours'] = df['delta_t_hours'].fillna(df['delta_t_mode'])
         df.dropna(inplace=True) #to ensure that there are no na values, which would mess up the comparison. This will drop days with only one reading.
 
         #compare delta_t_hours with delta_t_mode
-        print(f"delta_t_mode data type = {df['delta_t_mode'].dtype}")
-        print(f"delta_t_hours data type post-interpolation = {df['delta_t_hours'].dtype}")
+        # print(f"delta_t_mode data type = {df['delta_t_mode'].dtype}")
+        # print(f"delta_t_hours data type post-interpolation = {df['delta_t_hours'].dtype}")
         
 
         gap_flag = (df['delta_t_hours'] > 1.02 * df['delta_t_mode']).groupby(df['date']).any().astype(bool)
@@ -255,7 +255,7 @@ class Clean:
         daily_span_hours = (g.max() - g.min()).dt.total_seconds() / 3600
         weekly_max_span = daily_span_hours.rolling(window=7, center=True, min_periods=1).max()
         span_flag = daily_span_hours >= 0.85 * weekly_max_span #becomes boolean
-        print("\t\tspan_flag done")
+        # print("\t\tspan_flag done")
         
         #going to merge along index, so make sure indices are the same
         span_flag.index = pd.to_datetime(span_flag.index)
@@ -297,7 +297,7 @@ class Clean:
         #append to global date_summaries
         self.date_summaries = pd.concat([self.date_summaries, date_summaries], ignore_index = True).drop_duplicates().sort_values(by = 'date')
         
-        print('\tending good_days')
+        # print('\tending good_days')
         return good_days_df #only the good days in the data set from THIS function run
 
 
@@ -310,7 +310,7 @@ class Clean:
         Returns:
             pd.DataFrame: only the good days in the cleaned data
         """
-        print("\tbeginning keep_good_days_only")
+        # print("\tbeginning keep_good_days_only")
         if len(data)==0:
             return data
         good_days_set = set(self.good_days(data)['date'])
@@ -392,7 +392,7 @@ class Clean:
         # now sort by hour and find hourly sum to get total energy in kwh
         df['hour'] = df['time'].dt.floor('h')
         hourly = df.groupby('hour', as_index=False)['energy'].sum()
-        hourly.rename(columns={'hour': 'time'})
+        hourly = hourly.rename(columns={'hour': 'time'})
 
         return hourly
     
@@ -452,6 +452,8 @@ class Clean:
                 out_dir = Path(self.write_to_path) / "good_days"
                 out_dir.mkdir(parents=True, exist_ok=True)
                 #make file
+                if self.meter_or_inverter is None:
+                    self.meter_or_inverter = 'other'
                 file_path = out_dir / f"{self.system_id}_good_days_{self.meter_or_inverter}.csv"
                 self.good_days_df.to_csv(file_path, index=False)
 
