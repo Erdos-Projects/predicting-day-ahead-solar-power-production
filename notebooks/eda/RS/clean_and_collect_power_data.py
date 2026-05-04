@@ -180,6 +180,10 @@ class Clean:
             - no large time gaps of greater than 1.02*mode
             - at least 4 hours of readings if the mode time gap is followed
             - at least 0.85*the maximum number of daylight hours recorded
+            NEW CRITERIA:
+            - no large time gaps of >20 min (0.33hour)
+            - at least 4 hours of readings if the mode time gap is followed
+            - at least 0.85*the maximum number of daylight hours recorded
 
         Args:
             data (pd.DataFrame): dataframe with 'time' and 'power'. 'time' is of type datetime
@@ -216,7 +220,7 @@ class Clean:
         mode_map = date_summaries.set_index('date')['delta_t_mode']
         df['delta_t_mode'] = df['date'].map(mode_map)
 
-        #CRITERION 1: NO LARGE GAPS
+        #CRITERION 1: NO LARGE GAPS -- need to be fewer than 20 min apart (0.33 hours)
         #see if there are large gaps!
             #create series of Boolean (whether is a large gap)
             #for each day, assign True (if exists large gap) or False (if not)
@@ -232,8 +236,9 @@ class Clean:
         # print(f"delta_t_hours data type post-interpolation = {df['delta_t_hours'].dtype}")
         
 
-        gap_flag = (df['delta_t_hours'] > 1.02 * df['delta_t_mode']).groupby(df['date']).any().astype(bool)
-        
+        #gap_flag = (df['delta_t_hours'] > 1.02 * df['delta_t_mode']).groupby(df['date']).any().astype(bool)
+        gap_flag = (df['delta_t_hours'] > 0.33).groupby(df['date']).any().astype(bool)
+
         #merge with date_summaries
         date_summaries = date_summaries.merge(
             gap_flag.rename('has_large_gap'),
@@ -274,14 +279,14 @@ class Clean:
             date_summaries['num_readings'] >= 4 / date_summaries['delta_t_mode']
         )
 
-        cond_mode_short = date_summaries['delta_t_mode'] <= 1
+        # cond_mode_short = date_summaries['delta_t_mode'] <= 1
 
 
         #combine all conditions into a good_day column
         date_summaries['good_day'] = (
             cond_no_large_gap &
             cond_enough_readings &
-            cond_mode_short &
+            # cond_mode_short &
             date_summaries['good_span']
         )
 
@@ -395,6 +400,48 @@ class Clean:
         hourly = hourly.rename(columns={'hour': 'time'})
 
         return hourly
+
+    def fix_timezones(self, data : pd.DataFrame) -> pd.DataFrame:
+        """transforms time into UTC/GMT offset (so daylight savings doesn't mess with things)
+
+        Args:
+            data (pd.DataFrame): input data with 'time' column of type datetime
+
+        Raises:
+            ValueError: for unrecognized timezone (at the moment, only recognizes 'America/New_York' and UTC offsets)
+
+        Returns:
+            pd.DataFrame: time/energy dataframe with time in UTC/GMT offset
+        """
+        df = data.copy()
+        timezone_or_utc_offset = self.systems_cleaned['timezone_or_utc_offset'].iloc[0] if self.systems_cleaned is not None else None
+        is_offset = self.looks_like_int(timezone_or_utc_offset)
+        # convert to utc_offset
+        if self.looks_like_int(timezone_or_utc_offset):
+            self.utc_offset = int(timezone_or_utc_offset)
+        else:
+            # convert timezone to utc_offset
+            if timezone_or_utc_offset == 'America/New_York':
+                self.utc_offset = -5
+            else:
+                raise ValueError(f"Timezone {timezone_or_utc_offset} not recognized.")
+        if is_offset:
+            return
+        else:
+            #convert timezone to utc_offset
+            #make sure time is in localized format; this will be the actual time zone
+            if self.systems_cleaned['timezone_or_utc_offset'].iloc[0] == 'America/New_York':
+                df['time'] = df['time'].dt.tz_localize('America/New_York')
+            #then convert
+            df['time'] = df['time'].dt.tz_convert(f'Etc/GMT{self.utc_offset:+d}')
+        
+        return df
+
+    def looks_like_int(self, x):
+        try:
+            return float(x).is_integer()
+        except (TypeError, ValueError):
+            return False
     
     def clean_all_and_write_to_file(self):
         """cleans data and writes it to file.
@@ -419,6 +466,7 @@ class Clean:
                     continue
                 data = self.keep_good_days_only(data)
                 data = self.convert_to_energy_LRS(data)
+                data = self.fix_timezones(data)
                 if len(data)==0:
                     continue
                 # write to file

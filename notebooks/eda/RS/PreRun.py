@@ -26,14 +26,13 @@ import openmeteo_requests
 
 
 class PreRun:
-    def __init__(self, system_id=0, path="",  meter_or_inverter=None, systems_cleaned=None):
+    def __init__(self, system_id=0, path="",  meter_or_inverter=None):
         """creates a PreRun object that can be used to load and filter data for a given system_id and meter_or_inverter
 
         Args:
             path (str, optional): path to the folder containing the folders good_days, inverter, meter, other. Defaults to "".
             system_id (int, optional): system_id. Defaults to 0.
             meter_or_inverter (str, optional): 'meter', 'inverter', or 'other' (None). Defaults to None.
-            systems_cleaned (pd.DataFrame, optional): the systems_cleaned dataframe. Defaults to None.
 
         Raises:
             ValueError: something else typed for meter_or_inverter
@@ -64,26 +63,26 @@ class PreRun:
         
 
         # figure out timezone stuff
-        self.systems_cleaned = systems_cleaned.loc[systems_cleaned['system_id']==int(self.system_id)] if systems_cleaned is not None else None
-        timezone_or_utc_offset = self.systems_cleaned['timezone_or_utc_offset'].iloc[0] if self.systems_cleaned is not None else None
-        self.is_offset = self.looks_like_int(timezone_or_utc_offset)
-        # convert to utc_offset
-        if self.looks_like_int(timezone_or_utc_offset):
-            self.utc_offset = int(timezone_or_utc_offset)
-        else:
-            # convert timezone to utc_offset
-            if timezone_or_utc_offset == 'America/New_York':
-                self.utc_offset = -5
-            else:
-                raise ValueError(f"Timezone {timezone_or_utc_offset} not recognized.")
-        #then fix the timezones
-        self.fix_timezones()
+        # self.systems_cleaned = systems_cleaned.loc[systems_cleaned['system_id']==int(self.system_id)] if systems_cleaned is not None else None
+        # timezone_or_utc_offset = self.systems_cleaned['timezone_or_utc_offset'].iloc[0] if self.systems_cleaned is not None else None
+        # self.is_offset = self.looks_like_int(timezone_or_utc_offset)
+        # # convert to utc_offset
+        # if self.looks_like_int(timezone_or_utc_offset):
+        #     self.utc_offset = int(timezone_or_utc_offset)
+        # else:
+        #     # convert timezone to utc_offset
+        #     if timezone_or_utc_offset == 'America/New_York':
+        #         self.utc_offset = -5
+        #     else:
+        #         raise ValueError(f"Timezone {timezone_or_utc_offset} not recognized.")
+        # #then fix the timezones
+        # self.fix_timezones()
 
-    def looks_like_int(self, x):
-        try:
-            return float(x).is_integer()
-        except (TypeError, ValueError):
-            return False
+    # def looks_like_int(self, x):
+    #     try:
+    #         return float(x).is_integer()
+    #     except (TypeError, ValueError):
+    #         return False
 
     def load_data(self):
         """loads all data from the parquet files in the directory into a single pandas DataFrame and stores it in self.data
@@ -101,20 +100,20 @@ class PreRun:
         self.amended_data = self.data.copy()
         # print(self.amended_data)
 
-    def fix_timezones(self):
-        #want to change everything to GMT offset 
-        #find original timezone using systems_cleaned
-        if self.is_offset:
-            return
-        else:
-            #convert timezone to utc_offset
-            #make sure time is in localized format; this will be the actual time zone
-            if self.systems_cleaned['timezone_or_utc_offset'].iloc[0] == 'America/New_York':
-                self.data['time'] = self.data['time'].dt.tz_localize('America/New_York')
-            #then convert
-            self.data['time'] = self.data['time'].dt.tz_convert(f'Etc/GMT{self.utc_offset:+d}')
+    # def fix_timezones(self):
+    #     #want to change everything to GMT offset 
+    #     #find original timezone using systems_cleaned
+    #     if self.is_offset:
+    #         return
+    #     else:
+    #         #convert timezone to utc_offset
+    #         #make sure time is in localized format; this will be the actual time zone
+    #         if self.systems_cleaned['timezone_or_utc_offset'].iloc[0] == 'America/New_York':
+    #             self.data['time'] = self.data['time'].dt.tz_localize('America/New_York')
+    #         #then convert
+    #         self.data['time'] = self.data['time'].dt.tz_convert(f'Etc/GMT{self.utc_offset:+d}')
         
-        self.amended_data = self.data.copy()
+    #     self.amended_data = self.data.copy()
 
     def good_end_days_naive(self, streak: int) -> pd.DataFrame:
         """returns a DataFrame of the last day of each streak of good days of length >= streak.
