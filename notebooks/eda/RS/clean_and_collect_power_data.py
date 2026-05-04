@@ -437,7 +437,7 @@ class Clean:
             if self.systems_cleaned['timezone_or_utc_offset'].iloc[0] == 'America/New_York':
                 df['time'] = df['time'].dt.tz_localize('America/New_York')
             #then convert
-            df['time'] = df['time'].dt.tz_convert(f'Etc/GMT{self.utc_offset:+d}')
+            df['time'] = df['time'].dt.tz_convert(f'Etc/GMT{-self.utc_offset:+d}')
         
         print(f"after fixing timezone: {df}")
         return df
