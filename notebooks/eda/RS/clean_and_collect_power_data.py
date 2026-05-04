@@ -11,7 +11,7 @@ from copy import deepcopy
 #from tqdm import tqdm
 
 class Clean:
-    def __init__(self, system_id=0, path="", systems_cleaned=pd.DataFrame(), meter_or_inverter = None, write_to_path=""):
+    def __init__(self, system_id=0, path="", systems_cleaned=None, meter_or_inverter = None, write_to_path=""):
         """initialize object
 
         Args:
@@ -21,11 +21,13 @@ class Clean:
                                     Should have a subfolder for good_days lists (?)
             meter_or_inverter: if a parquet file, should say whether we're looking for meter or for inverter data.
                                 'meter' or 'inverter'
+            systems_cleaned (pd.DataFrame): dataframe consisting of metadata
         """
         self.system_id = str(system_id)
         self.path = Path(path) / str(system_id)
         self.partialpath = path
         self.write_to_path = write_to_path
+        print(systems_cleaned.columns)
         self.systems_cleaned = systems_cleaned[systems_cleaned['system_id'] == int(self.system_id)]
         #prize or parquet?
         if self.systems_cleaned.iloc[0]['is_prize_data']:
@@ -414,6 +416,7 @@ class Clean:
             pd.DataFrame: time/energy dataframe with time in UTC/GMT offset
         """
         df = data.copy()
+        print(f"before fixing timezone: {df}")
         timezone_or_utc_offset = self.systems_cleaned['timezone_or_utc_offset'].iloc[0] if self.systems_cleaned is not None else None
         is_offset = self.looks_like_int(timezone_or_utc_offset)
         # convert to utc_offset
@@ -426,7 +429,8 @@ class Clean:
             else:
                 raise ValueError(f"Timezone {timezone_or_utc_offset} not recognized.")
         if is_offset:
-            return
+            print("is offset a priori - do nothing")
+            return df
         else:
             #convert timezone to utc_offset
             #make sure time is in localized format; this will be the actual time zone
@@ -435,6 +439,7 @@ class Clean:
             #then convert
             df['time'] = df['time'].dt.tz_convert(f'Etc/GMT{self.utc_offset:+d}')
         
+        print(f"after fixing timezone: {df}")
         return df
 
     def looks_like_int(self, x):
