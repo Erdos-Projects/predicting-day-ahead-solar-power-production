@@ -208,8 +208,10 @@ class PreRun:
                      todays_lags=0, 
                      remove_todays_lags_nans=False,
                      include_month=False,
-                     include_day_of_month=False,
-                     include_hour = False) -> pd.DataFrame:
+                     include_hour = False,
+                     include_hour_cyclic=False,
+                     include_month_cyclic=False,
+                     include_day_of_year_cyclic=False) -> pd.DataFrame:
         """creates the dataframe of features
         NOTE: this all has to be done in one go, and before the weather data. 
         NOTE 2: removing nans likely leaves no available streaks. Recommend not removing all nans.
@@ -224,10 +226,11 @@ class PreRun:
             days_rolling_average_exact (int, optional): _description_. Defaults to 0.
             todays_lags (int, optional): _description_. Defaults to 0.
             remove_todays_lags_nans (bool, optional): whether to remove rows with NaN values in the todays_lag columns. Defaults to False.
-            include_month (bool, optional): _description_. Defaults to False.
-            include_hour (bool, optional): _description_. Defaults to False.
-            include_day_of_month (bool, optional): _description_. Defaults to False.
-            sunlight_duration (bool, optional): _description_. Defaults to False.
+            include_month (bool, optional): whether to include the month feature. Defaults to False.
+            include_hour (bool, optional): whether to include the hour feature. Defaults to False.
+            include_hour_cyclic (bool, optional): makes the hour feature cyclic. Defaults to False.
+            include_month_cyclic (bool, optional): makes the month feature cyclic. Defaults to False.
+            include_day_of_year_cyclic (bool, optional): makes the day of the year feature cyclic. Defaults to False.
 
         Returns:
             pd.DataFrame: dataframe with all added features
@@ -286,12 +289,21 @@ class PreRun:
 
         if include_month:
             df['month'] = df['time'].dt.month
+        if include_month_cyclic:
+            df['month_sin'] = np.sin((2 * np.pi * df['time'].dt.month-1) / 12)
+            df['month_cos'] = np.cos((2 * np.pi * df['time'].dt.month-1) / 12)
 
-        if include_day_of_month:
-            df['day_of_month'] = df['time'].dt.day
+        if include_day_of_year_cyclic:
+            day = df['time'].dt.dayofyear - 1
+            year_len = 365 + df['time'].dt.is_leap_year.astype(int)
+            df['day_of_year_sin'] = np.sin(2 * np.pi * day / year_len)
+            df['day_of_year_cos'] = np.cos(2 * np.pi * day / year_len)
         
         if include_hour:
             df['hour'] = df['time'].dt.hour
+        if include_hour_cyclic:
+            df['hour_sin'] = np.sin((2 * np.pi * df['time'].dt.hour) / 24)
+            df['hour_cos'] = np.cos((2 * np.pi * df['time'].dt.hour) / 24)
 
         self.amended_data = df
 
