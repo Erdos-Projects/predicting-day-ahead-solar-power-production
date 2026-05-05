@@ -318,7 +318,7 @@ class PreRun:
         latitude = self.systems_cleaned['latitude'].iloc[0]
         longitude = self.systems_cleaned['longitude'].iloc[0]
         tilt = self.systems_cleaned['tilt'].iloc[0]
-        azimuth = self.systems_cleaned['azimuth'].iloc[0]
+        azimuth = (self.systems_cleaned['azimuth'].iloc[0]%360) - 180 
         start_date = self.good_days['date'].min().strftime('%Y-%m-%d')
         end_date = self.good_days['date'].max().strftime('%Y-%m-%d')
         
