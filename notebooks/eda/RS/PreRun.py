@@ -252,7 +252,7 @@ class PreRun:
             # add a column containing (last year) - (last year and a day)
             df_last_year['lag'] = df_last_year['energy'] - df_last_year['energy'].shift(1)
 
-            df_last_year = df_last_year.rename(columns={'energy': 'last_year', 'lag': 'last_year_minus_last_year_and_a_day'})
+            df_last_year = df_last_year.rename(columns={'energy': 'last_year', 'lag': 'last_year_minus_last_year_and_an hour'})
 
             # Merge
             df = df.merge(df_last_year, on='time', how='left')
@@ -281,7 +281,7 @@ class PreRun:
 
         #remove nans if specified.
         if remove_last_year_nans:
-            df = df.dropna(subset=['last_year', 'last_year_minus_last_year_and_a_day']).reset_index(drop=True)
+            df = df.dropna(subset=['last_year', 'last_year_minus_last_year_and_an_hour']).reset_index(drop=True)
         if remove_daily_lags_nans:
             df = df.dropna(subset=[f"{i}_days_ago" for i in range(1,daily_lags+1)]).reset_index(drop=True)
         if remove_todays_lags_nans: #this HAS to come after the others since we might want to keep these nans
