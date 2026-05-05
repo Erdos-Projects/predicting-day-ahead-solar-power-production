@@ -15,13 +15,14 @@ import openmeteo_requests
 
 # Order to do things in:
 # 1. Create PreRun object with system_id, path, meter_or_inverter, and systems_cleaned
-# 2. add_energy_features_only
-# 3. add_weather_features_only
-# (can swap 2 and 3)
+# 2. fill_missing_hours
+# 3. add_energy_features_only
+# 4. add_weather_features_only
+# (can swap 3 and 4)
 # The dataframe as a whole with ALL selected features is stored in self.amended_data, the original data in self.data
-# 4. good_end_days_naive
-# 5. naive_tts_dates_only <- to get naive train/test split
-# 6. data_until_ho_day <- to get all data until a given ho_day 
+# 5. good_end_days_naive
+# 6. naive_tts_dates_only <- to get naive train/test split
+# 7. data_until_ho_day <- to get all data until a given ho_day 
 
 
 
