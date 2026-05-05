@@ -27,7 +27,7 @@ class Clean:
         self.path = Path(path) / str(system_id)
         self.partialpath = path
         self.write_to_path = write_to_path
-        print(systems_cleaned.columns)
+        #print(systems_cleaned.columns)
         self.systems_cleaned = systems_cleaned[systems_cleaned['system_id'] == int(self.system_id)]
         #prize or parquet?
         if self.systems_cleaned.iloc[0]['is_prize_data']:

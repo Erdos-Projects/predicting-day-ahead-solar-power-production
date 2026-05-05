@@ -79,12 +79,6 @@ class PreRun:
         # #then fix the timezones
         # self.fix_timezones()
 
-    # def looks_like_int(self, x):
-    #     try:
-    #         return float(x).is_integer()
-    #     except (TypeError, ValueError):
-    #         return False
-
     def load_data(self):
         """loads all data from the parquet files in the directory into a single pandas DataFrame and stores it in self.data
 
@@ -100,6 +94,12 @@ class PreRun:
         self.data['time'] = pd.to_datetime(self.data['time'])
         self.amended_data = self.data.copy()
         # print(self.amended_data)
+
+    def looks_like_int(self, x):
+        try:
+            return float(x).is_integer()
+        except (TypeError, ValueError):
+            return False
 
     # def fix_timezones(self):
     #     #want to change everything to GMT offset 
@@ -169,6 +169,36 @@ class PreRun:
         filtered_data = self.amended_data[self.amended_data['date'] <= ho_day].reset_index(drop=True)
         return filtered_data
     
+    def fill_missing_hours(self, fill_value=0):
+        """for existing days, fills missing hours with the given fill_value.
+        NEEDS TESTING.
+
+        Args:
+            fill_value (int, optional): what to fill missing hours with. Defaults to 0.
+        """
+        
+        df = self.data.copy()
+        # ensure datetime
+        df['time'] = pd.to_datetime(df['time'])
+        
+        # set index
+        df = df.set_index('time')
+        
+        # function to apply per day
+        def reindex_day(group):
+            start = group.index.min().floor('D') # start of the day
+            end = start + pd.Timedelta(hours=23) # end of the day
+            full_range = pd.date_range(start, end, freq='h') # full range of hours for that day
+            return group.reindex(full_range)
+        
+        # apply per day
+        df = df.groupby(df.index.date, group_keys=False).apply(reindex_day)
+        
+        # fill energy
+        df['energy'] = df['energy'].fillna(fill_value)
+        
+        self.amended_data = df.reset_index().rename(columns={'index': 'time'})
+    
     def add_energy_features_only(self, 
                      daily_lags=0, 
                      remove_daily_lags_nans=True,
@@ -201,7 +231,7 @@ class PreRun:
         Returns:
             pd.DataFrame: dataframe with all added features
         """
-        df=self.data.copy()
+        df=self.amended_data.copy()
         df['time'] = pd.to_datetime(df['time'])
         df = df.sort_values('time').reset_index(drop=True)
         df["day"] = df["time"].dt.floor("D") # for aligning thing later. should drop.
@@ -305,6 +335,7 @@ class PreRun:
             "start_date": start_date,
             "end_date": end_date,
             "hourly": ["cloud_cover", "global_tilted_irradiance"],
+            "daily": ["sunrise", "sunset"],
             "timezone": "GMT",
             "tilt": tilt,
 	        "azimuth": azimuth,
@@ -344,5 +375,52 @@ class PreRun:
         #will want weather data to match energy data in terms of timezone
         #remove the utc offset information and have naive timestamps. Note DST is not accounted for here, but we are using the same timestamps for energy and weather data so it should be consistent.
         hourly_dataframe["time"] = hourly_dataframe["time"].dt.tz_localize(None)
-        
+
+
+        # Process daily data. The order of variables needs to be the same as requested.
+        daily = response.Daily()
+        daily_sunrise = daily.Variables(0).ValuesInt64AsNumpy()
+        daily_sunset = daily.Variables(1).ValuesInt64AsNumpy()
+
+        daily_data = {"date": pd.date_range(
+            start = pd.to_datetime(daily.Time(), unit = "s", utc = True),
+            end =  pd.to_datetime(daily.TimeEnd(), unit = "s", utc = True),
+            freq = pd.Timedelta(seconds = daily.Interval()),
+            inclusive = "left"
+        )}
+
+        daily_data["sunrise"] = daily_sunrise
+        daily_data["sunset"] = daily_sunset
+
+        daily_dataframe = pd.DataFrame(data = daily_data) #currently in Unix timestamps
+
+        #convert to datetime
+        daily_dataframe['sunrise'] = pd.to_datetime(daily_dataframe['sunrise'], unit='s', utc=True)
+        daily_dataframe['sunset']  = pd.to_datetime(daily_dataframe['sunset'],  unit='s', utc=True)
+
+        #convert to correct UTC offset
+        daily_dataframe['sunrise'] = daily_dataframe['sunrise'].dt.tz_convert(f'Etc/GMT{self.utc_offset:+d}')
+        daily_dataframe['sunset']  = daily_dataframe['sunset'].dt.tz_convert(f'Etc/GMT{self.utc_offset:+d}')
+
+        #remove utc offset information and have naive timestamps. Note DST is not accounted for here, but we are using the same timestamps for energy and weather data so it should be consistent.
+        daily_dataframe['sunrise'] = daily_dataframe['sunrise'].dt.tz_localize(None)
+        daily_dataframe['sunset']  = daily_dataframe['sunset'].dt.tz_localize(None)
+
+        daily_dataframe['date'] = daily_dataframe['sunrise'].dt.date
+
+        # GOAL: create a column of hourly_dataframe that has the proportion of that hour that was during sunlight hours.
+        hourly_dataframe['date'] = hourly_dataframe['time'].dt.date
+        hourly_dataframe = hourly_dataframe.merge(daily_dataframe[['date', 'sunrise', 'sunset']], on='date', how='left')
+
+        start = hourly_dataframe['time']
+        end = hourly_dataframe['time'] + pd.Timedelta(hours=1)
+        overlap_start = pd.concat([start, hourly_dataframe['sunrise']], axis=1).max(axis=1)
+        overlap_end   = pd.concat([end,   hourly_dataframe['sunset']],  axis=1).min(axis=1)
+        overlap = (overlap_end - overlap_start).dt.total_seconds()
+        # convert to proportion of hour
+        hourly_dataframe['proportion_daytime'] = np.clip(overlap / 3600, 0, 1)
+
+        # remove unnecessary columns
+        hourly_dataframe = hourly_dataframe.drop(columns=['date', 'sunrise', 'sunset'])
+
         return hourly_dataframe
