@@ -93,8 +93,15 @@ class PreRun:
         # print(self.data.columns)
         self.data = self.data[['time', 'energy']]
         self.data['time'] = pd.to_datetime(self.data['time'])
+        self.data = self.data.sort_values('time').reset_index(drop=True)
         self.amended_data = self.data.copy()
-        # print(self.amended_data)
+
+        # make sure the data is valid -- within a day, all the differences should be 1 hour
+        df = self.data.copy()
+        df['date'] = df['time'].dt.date
+        df['in_day_time_diff'] = df.groupby('date')['time'].diff().dt.total_seconds() / 3600
+        if not df['in_day_time_diff'].dropna().eq(1).all():
+            raise ValueError("Data is not valid. Within a day, all time differences should be 1 hour.")
 
     def looks_like_int(self, x):
         try:
@@ -202,9 +209,9 @@ class PreRun:
     
     def add_energy_features_only(self, 
                      daily_lags=0, 
-                     remove_daily_lags_nans=True,
+                     remove_daily_lags_nans=False,
                      include_last_year=False, 
-                     remove_last_year_nans=True,
+                     remove_last_year_nans=False,
                      todays_lags=0, 
                      remove_todays_lags_nans=False,
                      include_month=False,
@@ -249,11 +256,16 @@ class PreRun:
             df_last_year = df[['time', 'energy']].copy()
             df_last_year['time'] = df_last_year['time'] + pd.DateOffset(years=1)
 
-            # add a column containing (last year) - (last year and a day)
-            df_last_year['lag'] = df_last_year['energy'] - df_last_year['energy'].shift(1)
+            #will need to group by date, so make a date column
+            df_last_year['date'] = df_last_year['time'].dt.date
+            #make lag column of energy at previous hour reading from last year. also fill 0's.
+            df_last_year['lag'] = df_last_year.groupby('date')['energy'].shift(1).fillna(0)
+            #but actually want the difference
+            df_last_year['lag'] = df_last_year['energy'] - df_last_year['lag']
 
-            df_last_year = df_last_year.rename(columns={'energy': 'last_year', 'lag': 'last_year_minus_last_year_and_an hour'})
+            df_last_year = df_last_year.rename(columns={'energy': 'last_year', 'lag': 'last_year_minus_last_year_and_an_hour'})
 
+            df_last_year = df_last_year.drop(columns=['date'])
             # Merge
             df = df.merge(df_last_year, on='time', how='left')
 
