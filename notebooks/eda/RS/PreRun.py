@@ -275,11 +275,11 @@ class PreRun:
         #do daily lags: includes previous daily_lags days at exactly the same time
         if daily_lags>0:
             for i in range(1,daily_lags+1):
-                # df_temp = self.data.copy()
-                # df_temp['time'] = df_temp['time'] + pd.Timedelta(days=1)
-                # df_temp.rename(columns = {'energy':f'daily_lag_{i}'}, inplace=True)
-                # df = df.merge(df_temp, on='time', how = 'left')
-                df[f"{i}_days_ago"] = (df.groupby(df["time"].dt.time)["energy"].shift(24 * i))
+                df_temp = self.data.copy()
+                df_temp['time'] = df_temp['time'] + pd.Timedelta(days=i)
+                df_temp.rename(columns = {'energy':f'{i}_days_ago'}, inplace=True)
+                df = df.merge(df_temp, on='time', how = 'left')
+                
         
 
         #todays_lags -- previous readings from the same day. 
