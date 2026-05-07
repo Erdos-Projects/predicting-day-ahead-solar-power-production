@@ -1,3 +1,5 @@
+from time import strftime
+
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
@@ -7,16 +9,32 @@ import seaborn as sns
 from datetime import date, datetime, timedelta
 from itertools import product
 from copy import deepcopy
+import requests_cache
+from retry_requests import retry
+import openmeteo_requests
+
+# Order to do things in:
+# 1. Create PreRun object with system_id, path, meter_or_inverter, and systems_cleaned
+# 2. fill_missing_hours
+# 3. add_energy_features_only
+# 4. add_weather_features_only
+# (can swap 3 and 4)
+# The dataframe as a whole with ALL selected features is stored in self.amended_data, the original data in self.data
+# 5. good_end_days_naive
+# 6. naive_tts_dates_only <- to get naive train/test split
+# 7. data_until_ho_day <- to get all data until a given ho_day 
+
+
 
 class PreRun:
-    def __init__(self, path="", system_id=0, meter_or_inverter=None, systems_cleaned=None):
+    def __init__(self, system_id=0, path="",  meter_or_inverter=None, systems_cleaned=None):
         """creates a PreRun object that can be used to load and filter data for a given system_id and meter_or_inverter
 
         Args:
             path (str, optional): path to the folder containing the folders good_days, inverter, meter, other. Defaults to "".
             system_id (int, optional): system_id. Defaults to 0.
             meter_or_inverter (str, optional): 'meter', 'inverter', or 'other' (None). Defaults to None.
-            systems_cleaned (pd.DataFrame, optional): the systems_cleaned dataframe. Defaults to None.
+            systems_cleaned (pd.DataFrame, optional): DataFrame containing metadata. Defaults to None.
 
         Raises:
             ValueError: something else typed for meter_or_inverter
@@ -26,20 +44,28 @@ class PreRun:
         elif meter_or_inverter not in ['meter', 'inverter', 'other']:
             raise ValueError("meter_or_inverter must be 'meter', 'inverter', 'other', or None")
         
-        self.path = Path(path) / meter_or_inverter / str(system_id)
-
         self.system_id = str(system_id)
         self.meter_or_inverter = meter_or_inverter
-        self.data = None
-        path_good_days = self.path / 'good_days' / f'{self.system_id}_good_days_{meter_or_inverter}.csv'
-        self.good_days = pd.read_csv(path_good_days) if path_good_days.exists() else None
 
+        #load good_days file
+        path_good_days = Path(path) / 'good_days' / f'{self.system_id}_good_days_{meter_or_inverter}.csv'
+        self.good_days = pd.read_csv(path_good_days) #if path_good_days.exists() else None
+        self.good_days['date'] = pd.to_datetime(self.good_days['date'])
+
+        #make path to data
+        self.path = Path(path) / meter_or_inverter / str(system_id)
+
+        #load the data
+        self.data=None
+        self.amended_data = None
+        self.load_data()
+        print(self.data)
         self.end_days = None
         self.end_days_naive = None
-        self.amended_data = self.data
+        
 
         # figure out timezone stuff
-        self.systems_cleaned = systems_cleaned[str(systems_cleaned['system_id'])==self.system_id] if systems_cleaned is not None else None
+        self.systems_cleaned = systems_cleaned.loc[systems_cleaned['system_id']==int(self.system_id)] if systems_cleaned is not None else None
         timezone_or_utc_offset = self.systems_cleaned['timezone_or_utc_offset'].iloc[0] if self.systems_cleaned is not None else None
         self.is_offset = self.looks_like_int(timezone_or_utc_offset)
         # convert to utc_offset
@@ -51,12 +77,8 @@ class PreRun:
                 self.utc_offset = -5
             else:
                 raise ValueError(f"Timezone {timezone_or_utc_offset} not recognized.")
-
-    def looks_like_int(x):
-        try:
-            return float(x).is_integer()
-        except (TypeError, ValueError):
-            return False
+        # #then fix the timezones
+        # self.fix_timezones()
 
     def load_data(self):
         """loads all data from the parquet files in the directory into a single pandas DataFrame and stores it in self.data
@@ -65,33 +87,42 @@ class PreRun:
             FileNotFoundError: no parquet files found in the directory
         """
         # Load all parquet files in the directory
-        all_files = list(self.path.glob("*.parquet"))
-        if not all_files:
-            raise FileNotFoundError(f"No parquet files found in {self.path}")
-        
-        data_frames = []
-        for file in all_files:
-            df = pq.read_table(file).to_pandas()
-            data_frames.append(df)
-        
-        self.data = pd.concat(data_frames, ignore_index=True)
+        folder = Path(self.path)
+        requested_pq = pq.ParquetDataset(folder)
+        self.data = requested_pq.read().to_pandas()
+        # print(self.data.columns)
+        self.data = self.data[['time', 'energy']]
         self.data['time'] = pd.to_datetime(self.data['time'])
+        self.data = self.data.sort_values('time').reset_index(drop=True)
         self.amended_data = self.data.copy()
 
-    def fix_timezones(self):
-        #want to change everything to GMT offset 
-        #find original timezone using systems_cleaned
-        if self.is_offset:
-            return
-        else:
-            #convert timezone to utc_offset
-            #make sure time is in localized format; this will be the actual time zone
-            if self.systems_cleaned['timezone_or_utc_offset'].iloc[0] == 'America/New_York':
-                self.data['time'] = self.data['time'].dt.tz_localize('America/New_York')
-            #then convert
-            self.data['time'] = self.data['time'].dt.tz_convert(f'Etc/GMT{self.utc_offset:+d}')
+        # make sure the data is valid -- within a day, all the differences should be 1 hour
+        df = self.data.copy()
+        df['date'] = df['time'].dt.date
+        df['in_day_time_diff'] = df.groupby('date')['time'].diff().dt.total_seconds() / 3600
+        if not df['in_day_time_diff'].dropna().eq(1).all():
+            raise ValueError("Data is not valid. Within a day, all time differences should be 1 hour.")
+
+    def looks_like_int(self, x):
+        try:
+            return float(x).is_integer()
+        except (TypeError, ValueError):
+            return False
+
+    # def fix_timezones(self):
+    #     #want to change everything to GMT offset 
+    #     #find original timezone using systems_cleaned
+    #     if self.is_offset:
+    #         return
+    #     else:
+    #         #convert timezone to utc_offset
+    #         #make sure time is in localized format; this will be the actual time zone
+    #         if self.systems_cleaned['timezone_or_utc_offset'].iloc[0] == 'America/New_York':
+    #             self.data['time'] = self.data['time'].dt.tz_localize('America/New_York')
+    #         #then convert
+    #         self.data['time'] = self.data['time'].dt.tz_convert(f'Etc/GMT{self.utc_offset:+d}')
         
-        self.amended_data = self.data.copy()
+    #     self.amended_data = self.data.copy()
 
     def good_end_days_naive(self, streak: int) -> pd.DataFrame:
         """returns a DataFrame of the last day of each streak of good days of length >= streak.
@@ -102,11 +133,10 @@ class PreRun:
         Returns:
             pd.DataFrame: DataFrame of the last day of each streak of good days of length >= streak
         """
-        if self.good_days is None:
-            raise ValueError("good_days is not loaded. Please load good_days before finding good end days.")
         
         self.good_days = self.good_days.sort_values('date').reset_index(drop=True)
         self.good_days['streak_id'] = (self.good_days['date'] - self.good_days['date'].shift(1) != timedelta(days=1)).cumsum()
+        print(self.good_days)
         streaks = self.good_days.groupby('streak_id').filter(lambda x: len(x) >= streak)
         end_days = streaks.groupby('streak_id').last().reset_index(drop=True)
         
@@ -147,7 +177,37 @@ class PreRun:
         filtered_data = self.amended_data[self.amended_data['date'] <= ho_day].reset_index(drop=True)
         return filtered_data
     
-    def add_power_features_only(self, 
+    def fill_missing_hours(self, fill_value=0):
+        """for existing days, fills missing hours with the given fill_value.
+        NEEDS TESTING.
+
+        Args:
+            fill_value (int, optional): what to fill missing hours with. Defaults to 0.
+        """
+        
+        df = self.data.copy()
+        # ensure datetime
+        df['time'] = pd.to_datetime(df['time'])
+        
+        # set index
+        df = df.set_index('time')
+        
+        # function to apply per day
+        def reindex_day(group):
+            start = group.index.min().floor('D') # start of the day
+            end = start + pd.Timedelta(hours=23) # end of the day
+            full_range = pd.date_range(start, end, freq='h') # full range of hours for that day
+            return group.reindex(full_range)
+        
+        # apply per day
+        df = df.groupby(df.index.date, group_keys=False).apply(reindex_day)
+        
+        # fill energy
+        df['energy'] = df['energy'].fillna(fill_value)
+        
+        self.amended_data = df.reset_index().rename(columns={'index': 'time'})
+    
+    def add_energy_features_only(self, 
                      daily_lags=0, 
                      remove_daily_lags_nans=False,
                      include_last_year=False, 
@@ -155,90 +215,116 @@ class PreRun:
                      todays_lags=0, 
                      remove_todays_lags_nans=False,
                      include_month=False,
-                     include_day_of_month=False,
-                     include_hour = False) -> pd.DataFrame:
+                     include_hour = False,
+                     include_hour_cyclic=False,
+                     include_month_cyclic=False,
+                     include_day_of_year_cyclic=False) -> pd.DataFrame:
         """creates the dataframe of features
-        NOTE: DAYLIGHT SAVINGS!!!! last_year, daily_lags
+        NOTE: this all has to be done in one go, and before the weather data. 
+        NOTE 2: removing nans likely leaves no available streaks. Recommend not removing all nans.
+        NOTE 3: if we can't deal with nans but want to use daily lags, can replace those nans with 0's (since the reading was just very low)
 
         Args:
-            data (pd.DataFrame): first column, titled 'time', is times. Second column is 'power' in kW
+            data (pd.DataFrame): first column, titled 'time', is times. Second column is 'energy' in kW
             daily_lags (int, optional): number of past days' data at the same . Defaults to 0.
-            remove_daily_lags_nans (bool, optional): whether to remove rows with NaN values in the daily_lag columns. Defaults to False.
+            remove_daily_lags_nans (bool, optional): whether to remove rows with NaN values in the daily_lag columns. Defaults to True.
             include_last_year (bool, optional): _description_. Defaults to False.
-            remove_last_year_nans (bool, optional): whether to remove rows with NaN values in the last_year and last_year_lag columns. Defaults to False.
+            remove_last_year_nans (bool, optional): whether to remove rows with NaN values in the last_year and last_year_lag columns. Defaults to True.
             days_rolling_average_exact (int, optional): _description_. Defaults to 0.
             todays_lags (int, optional): _description_. Defaults to 0.
             remove_todays_lags_nans (bool, optional): whether to remove rows with NaN values in the todays_lag columns. Defaults to False.
-            include_month (bool, optional): _description_. Defaults to False.
-            include_hour (bool, optional): _description_. Defaults to False.
-            include_day_of_month (bool, optional): _description_. Defaults to False.
-            sunlight_duration (bool, optional): _description_. Defaults to False.
+            include_month (bool, optional): whether to include the month feature. Defaults to False.
+            include_hour (bool, optional): whether to include the hour feature. Defaults to False.
+            include_hour_cyclic (bool, optional): makes the hour feature cyclic. Defaults to False.
+            include_month_cyclic (bool, optional): makes the month feature cyclic. Defaults to False.
+            include_day_of_year_cyclic (bool, optional): makes the day of the year feature cyclic. Defaults to False.
 
         Returns:
             pd.DataFrame: dataframe with all added features
         """
-        df=self.data.copy()
+        df=self.amended_data.copy()
         df['time'] = pd.to_datetime(df['time'])
-
+        df = df.sort_values('time').reset_index(drop=True)
+        df["day"] = df["time"].dt.floor("D") # for aligning thing later. should drop.
         
         #if we want to include last year's reading
-        #creates two columns: 'last_year' and 'last_year_lag'. 'last_year' is the power reading from the same time last year. 'last_year_lag' is the difference between the power reading from the same time last year and the power reading from the same time last year and a day. 
+        #creates two columns: 'last_year' and 'last_year_lag'. 'last_year' is the energy reading from the same time last year. 'last_year_lag' is the difference between the energy reading from the same time last year and the energy reading from the same time last year and a day. 
         # This is to try and offset daylight savings.
         # does NOT take into account time zones/daylight savings time.
         if include_last_year:
             # Create a copy with time shifted forward by 1 year
-            df_last_year = df[['time', 'power']].copy()
+            df_last_year = df[['time', 'energy']].copy()
             df_last_year['time'] = df_last_year['time'] + pd.DateOffset(years=1)
 
-            # add a column containing (last year) - (last year and a day)
-            df_last_year['lag'] = df_last_year['power'] - df_last_year['power'].shift(1)
+            #will need to group by date, so make a date column
+            df_last_year['date'] = df_last_year['time'].dt.date
+            #make lag column of energy at previous hour reading from last year. also fill 0's.
+            df_last_year['lag'] = df_last_year.groupby('date')['energy'].shift(1).fillna(0)
+            #but actually want the difference
+            df_last_year['lag'] = df_last_year['energy'] - df_last_year['lag']
 
-            df_last_year = df_last_year.rename(columns={'power': 'last_year', 'lag': 'last_year_lag'})
+            df_last_year = df_last_year.rename(columns={'energy': 'last_year', 'lag': 'last_year_minus_last_year_and_an_hour'})
 
+            df_last_year = df_last_year.drop(columns=['date'])
             # Merge
             df = df.merge(df_last_year, on='time', how='left')
 
-        # this leaves us with lots of days with missing values for last_year and last_year_lag
-        # delete these
-        if remove_last_year_nans:
-            df = df.dropna().reset_index(drop=True)
+        
+        
 
         #do daily lags: includes previous daily_lags days at exactly the same time
         if daily_lags>0:
             for i in range(1,daily_lags+1):
-                df_temp = df.copy()
-                df_temp['time'] = df_temp['time'] + pd.Timedelta(days=1)
-                df_temp.rename(columns = {'power':f'daily_lag_{i}'}, inplace=True)
+                df_temp = self.data.copy()
+                df_temp['time'] = df_temp['time'] + pd.Timedelta(days=i)
+                df_temp.rename(columns = {'energy':f'{i}_days_ago'}, inplace=True)
                 df = df.merge(df_temp, on='time', how = 'left')
-        if remove_daily_lags_nans:
-            df = df.dropna().reset_index(drop=True)
+                
+        
 
         #todays_lags -- previous readings from the same day. 
         if todays_lags>0:
             for i in range(1,todays_lags+1):
-                df_temp = df.copy()
-                df_temp['power'] = df_temp['power'].shift(1)
-                df_temp.rename(columns = {'power':f'todays_lag_{i}'}, inplace=True)
-                df = df.merge(df_temp, on='time', how = 'left')
+                # df_temp = self.data.copy()
+                # df_temp['energy'] = df_temp['energy'].shift(1)
+                # df_temp.rename(columns = {'energy':f'{i}_hours_ago_today'}, inplace=True)
+                # df = df.merge(df_temp, on='time', how = 'left')
+                df[f'{i}_hours_ago_today'] = df.groupby(df['time'].dt.floor('D'))['energy'].shift(i)
 
-        if remove_todays_lags_nans:
-            df = df.dropna().reset_index(drop=True)
+        #remove nans if specified.
+        if remove_last_year_nans:
+            df = df.dropna(subset=['last_year', 'last_year_minus_last_year_and_an_hour']).reset_index(drop=True)
+        if remove_daily_lags_nans:
+            df = df.dropna(subset=[f"{i}_days_ago" for i in range(1,daily_lags+1)]).reset_index(drop=True)
+        if remove_todays_lags_nans: #this HAS to come after the others since we might want to keep these nans
+            df = df.dropna(subset=[f'{i}_hours_ago_today' for i in range(1,todays_lags+1)]).reset_index(drop=True)
 
         if include_month:
             df['month'] = df['time'].dt.month
+        if include_month_cyclic:
+            df['month_sin'] = np.sin((2 * np.pi * df['time'].dt.month-1) / 12)
+            df['month_cos'] = np.cos((2 * np.pi * df['time'].dt.month-1) / 12)
 
-        if include_day_of_month:
-            df['day_of_month'] = df['time'].dt.day
+        if include_day_of_year_cyclic:
+            day = df['time'].dt.dayofyear - 1
+            year_len = 365 + df['time'].dt.is_leap_year.astype(int)
+            df['day_of_year_sin'] = np.sin(2 * np.pi * day / year_len)
+            df['day_of_year_cos'] = np.cos(2 * np.pi * day / year_len)
         
         if include_hour:
             df['hour'] = df['time'].dt.hour
+        if include_hour_cyclic:
+            df['hour_sin'] = np.sin((2 * np.pi * df['time'].dt.hour) / 24)
+            df['hour_cos'] = np.cos((2 * np.pi * df['time'].dt.hour) / 24)
 
         self.amended_data = df
 
         #update good_days to only include days where we have all the features 
-        if self.good_days is not None:
-            self.good_days = self.good_days[self.good_days['date'].isin(df['time'].dt.date)].reset_index(drop=True)
+        self.good_days = df['day'].drop_duplicates().reset_index(drop=True).to_frame().rename(columns={'day':'date'})
 
+        #remove 'day' column from amended_data
+        self.amended_data = self.amended_data.drop(columns=['day'])
+        
         return df
 
     def add_weather_features_only(self):
@@ -246,19 +332,19 @@ class PreRun:
         """
         #get weather data
         weather_data = self.gather_weather_data()
-        #merge with power data
+        #merge with energy data
         df = self.amended_data.copy()
         df = df.merge(weather_data, left_on='time', right_on='time', how='left')
-        df.dropna(inplace=True)
+        #df.dropna(inplace=True) #might drop too many things
         self.amended_data = df
 
     def gather_weather_data(self):
         latitude = self.systems_cleaned['latitude'].iloc[0]
         longitude = self.systems_cleaned['longitude'].iloc[0]
         tilt = self.systems_cleaned['tilt'].iloc[0]
-        azimuth = self.systems_cleaned['azimuth'].iloc[0]
-        start_date = self.good_days['date'].min()
-        end_date = self.good_days['date'].max()
+        azimuth = (self.systems_cleaned['azimuth'].iloc[0]%360) - 180 
+        start_date = self.good_days['date'].min().strftime('%Y-%m-%d')
+        end_date = self.good_days['date'].max().strftime('%Y-%m-%d')
         
         # Setup the Open-Meteo API client with cache and retry on error
         cache_session = requests_cache.CachedSession('.cache', expire_after = -1)
@@ -274,6 +360,7 @@ class PreRun:
             "start_date": start_date,
             "end_date": end_date,
             "hourly": ["cloud_cover", "global_tilted_irradiance"],
+            "daily": ["sunrise", "sunset"],
             "timezone": "GMT",
             "tilt": tilt,
 	        "azimuth": azimuth,
@@ -282,10 +369,10 @@ class PreRun:
 
         # Process first location. Add a for-loop for multiple locations or weather models
         response = responses[0]
-        print(f"Coordinates: {response.Latitude()}°N {response.Longitude()}°E")
-        print(f"Elevation: {response.Elevation()} m asl")
-        print(f"Timezone: {response.Timezone()}{response.TimezoneAbbreviation()}")
-        print(f"Timezone difference to GMT+0: {response.UtcOffsetSeconds()}s")
+        # print(f"Coordinates: {response.Latitude()}°N {response.Longitude()}°E")
+        # print(f"Elevation: {response.Elevation()} m asl")
+        # print(f"Timezone: {response.Timezone()}{response.TimezoneAbbreviation()}")
+        # print(f"Timezone difference to GMT+0: {response.UtcOffsetSeconds()}s")
 
         # Process hourly data. The order of variables needs to be the same as requested.
         hourly = response.Hourly()
@@ -310,8 +397,55 @@ class PreRun:
 
         # need to shift the time by the utc offset
         hourly_dataframe['time'] = hourly_dataframe['time'].dt.tz_convert(f'Etc/GMT{self.utc_offset:+d}')
-        #will want weather data to match power data in terms of timezone
-        #remove the utc offset information and have naive timestamps. Note DST is not accounted for here, but we are using the same timestamps for power and weather data so it should be consistent.
+        #will want weather data to match energy data in terms of timezone
+        #remove the utc offset information and have naive timestamps. Note DST is not accounted for here, but we are using the same timestamps for energy and weather data so it should be consistent.
         hourly_dataframe["time"] = hourly_dataframe["time"].dt.tz_localize(None)
-        
+
+
+        # Process daily data. The order of variables needs to be the same as requested.
+        daily = response.Daily()
+        daily_sunrise = daily.Variables(0).ValuesInt64AsNumpy()
+        daily_sunset = daily.Variables(1).ValuesInt64AsNumpy()
+
+        daily_data = {"date": pd.date_range(
+            start = pd.to_datetime(daily.Time(), unit = "s", utc = True),
+            end =  pd.to_datetime(daily.TimeEnd(), unit = "s", utc = True),
+            freq = pd.Timedelta(seconds = daily.Interval()),
+            inclusive = "left"
+        )}
+
+        daily_data["sunrise"] = daily_sunrise
+        daily_data["sunset"] = daily_sunset
+
+        daily_dataframe = pd.DataFrame(data = daily_data) #currently in Unix timestamps
+
+        #convert to datetime
+        daily_dataframe['sunrise'] = pd.to_datetime(daily_dataframe['sunrise'], unit='s', utc=True)
+        daily_dataframe['sunset']  = pd.to_datetime(daily_dataframe['sunset'],  unit='s', utc=True)
+
+        #convert to correct UTC offset
+        daily_dataframe['sunrise'] = daily_dataframe['sunrise'].dt.tz_convert(f'Etc/GMT{self.utc_offset:+d}')
+        daily_dataframe['sunset']  = daily_dataframe['sunset'].dt.tz_convert(f'Etc/GMT{self.utc_offset:+d}')
+
+        #remove utc offset information and have naive timestamps. Note DST is not accounted for here, but we are using the same timestamps for energy and weather data so it should be consistent.
+        daily_dataframe['sunrise'] = daily_dataframe['sunrise'].dt.tz_localize(None)
+        daily_dataframe['sunset']  = daily_dataframe['sunset'].dt.tz_localize(None)
+
+        daily_dataframe['date'] = daily_dataframe['sunrise'].dt.date
+
+        # GOAL: create a column of hourly_dataframe that has the proportion of that hour that was during sunlight hours.
+        hourly_dataframe['date'] = hourly_dataframe['time'].dt.date
+        hourly_dataframe = hourly_dataframe.merge(daily_dataframe[['date', 'sunrise', 'sunset']], on='date', how='left')
+
+        start = hourly_dataframe['time']
+        end = hourly_dataframe['time'] + pd.Timedelta(hours=1)
+        overlap_start = pd.concat([start, hourly_dataframe['sunrise']], axis=1).max(axis=1)
+        overlap_end   = pd.concat([end,   hourly_dataframe['sunset']],  axis=1).min(axis=1)
+        overlap = (overlap_end - overlap_start).dt.total_seconds()
+        # convert to proportion of hour
+        hourly_dataframe['proportion_daytime'] = np.clip(overlap / 3600, 0, 1)
+
+        # remove unnecessary columns
+        hourly_dataframe = hourly_dataframe.drop(columns=['date', 'sunrise', 'sunset'])
+
         return hourly_dataframe
