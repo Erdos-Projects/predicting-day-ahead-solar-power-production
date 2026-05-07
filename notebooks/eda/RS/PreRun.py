@@ -59,13 +59,13 @@ class PreRun:
         self.data=None
         self.amended_data = None
         self.load_data()
-        print(self.data)
+        # print(self.data)
         self.end_days = None
         self.end_days_naive = None
         
 
         # figure out timezone stuff
-        self.systems_cleaned = systems_cleaned.loc[systems_cleaned['system_id']==int(self.system_id)] if systems_cleaned is not None else None
+        self.systems_cleaned = systems_cleaned.loc[systems_cleaned['system_id']==int(self.system_id)]
         timezone_or_utc_offset = self.systems_cleaned['timezone_or_utc_offset'].iloc[0] if self.systems_cleaned is not None else None
         self.is_offset = self.looks_like_int(timezone_or_utc_offset)
         # convert to utc_offset
@@ -339,6 +339,7 @@ class PreRun:
         self.amended_data = df
 
     def gather_weather_data(self):
+
         latitude = self.systems_cleaned['latitude'].iloc[0]
         longitude = self.systems_cleaned['longitude'].iloc[0]
         tilt = self.systems_cleaned['tilt'].iloc[0]
@@ -449,3 +450,31 @@ class PreRun:
         hourly_dataframe = hourly_dataframe.drop(columns=['date', 'sunrise', 'sunset'])
 
         return hourly_dataframe
+    
+    def custom_error(y_true, y_pred, a=1, b=2):
+        """custom error to penalize overestimation. Like a weighted MSE.
+
+        Args:
+            y_true (_type_): _description_
+            y_pred (_type_): _description_
+            a (int, optional): coefficient of underestimation. Defaults to 1.
+            b (int, optional): coefficient of overestimation. Defaults to 1.
+
+        Returns:
+            float: mean error
+        """
+        # want a and b to sum to 1, so that the error is on the same scale as MSE
+        if a<0 or b<0:
+            raise ValueError("a and b must be non-negative")
+        elif a==0 and b==0:
+            raise ValueError("a and b cannot both be zero")
+        
+        c= a + b
+        a = a / c
+        b = b / c
+
+        Y = pd.DataFrame({'y_true': y_true.reset_index(drop=True), 'y_pred': y_pred.reset_index(drop=True)})
+        
+        Y['error'] = np.where(Y['y_true'] > Y['y_pred'], a * (Y['y_true'] - Y['y_pred']), b * (Y['y_pred'] - Y['y_true']))
+        
+        return Y['error'].mean()
