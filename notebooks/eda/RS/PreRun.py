@@ -451,30 +451,26 @@ class PreRun:
 
         return hourly_dataframe
     
-    def custom_error(y_true, y_pred, a=1, b=2):
+    def custom_error(y_true, y_pred, a=1, b=2)->float:
         """custom error to penalize overestimation. Like a weighted MSE.
 
         Args:
-            y_true (_type_): _description_
-            y_pred (_type_): _description_
+            y_true (Series): y_true
+            y_pred (Series): y_pred
             a (int, optional): coefficient of underestimation. Defaults to 1.
             b (int, optional): coefficient of overestimation. Defaults to 1.
 
         Returns:
             float: mean error
         """
-        # want a and b to sum to 1, so that the error is on the same scale as MSE
         if a<0 or b<0:
             raise ValueError("a and b must be non-negative")
         elif a==0 and b==0:
             raise ValueError("a and b cannot both be zero")
         
-        c= a + b
-        a = a / c
-        b = b / c
 
         Y = pd.DataFrame({'y_true': y_true.reset_index(drop=True), 'y_pred': y_pred.reset_index(drop=True)})
         
-        Y['error'] = np.where(Y['y_true'] > Y['y_pred'], a * (Y['y_true'] - Y['y_pred']), b * (Y['y_pred'] - Y['y_true']))
+        Y['error'] = np.where(Y['y_true'] > Y['y_pred'], a * (Y['y_true'] - Y['y_pred'])**2, b * (Y['y_pred'] - Y['y_true'])**2)
         
         return Y['error'].mean()
