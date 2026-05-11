@@ -59,12 +59,13 @@ class PreRun:
         self.data=None
         self.amended_data = None
         self.load_data()
-        # print(self.data)
+        print(self.data)
         self.end_days = None
+        self.end_days_naive = None
         
 
         # figure out timezone stuff
-        self.systems_cleaned = systems_cleaned.loc[systems_cleaned['system_id']==int(self.system_id)]
+        self.systems_cleaned = systems_cleaned.loc[systems_cleaned['system_id']==int(self.system_id)] if systems_cleaned is not None else None
         timezone_or_utc_offset = self.systems_cleaned['timezone_or_utc_offset'].iloc[0] if self.systems_cleaned is not None else None
         self.is_offset = self.looks_like_int(timezone_or_utc_offset)
         # convert to utc_offset
@@ -92,15 +93,8 @@ class PreRun:
         # print(self.data.columns)
         self.data = self.data[['time', 'energy']]
         self.data['time'] = pd.to_datetime(self.data['time'])
-        self.data = self.data.sort_values('time').reset_index(drop=True)
         self.amended_data = self.data.copy()
-
-        # make sure the data is valid -- within a day, all the differences should be 1 hour
-        df = self.data.copy()
-        df['date'] = df['time'].dt.date
-        df['in_day_time_diff'] = df.groupby('date')['time'].diff().dt.total_seconds() / 3600
-        if not df['in_day_time_diff'].dropna().eq(1).all():
-            raise ValueError("Data is not valid. Within a day, all time differences should be 1 hour.")
+        # print(self.amended_data)
 
     def looks_like_int(self, x):
         try:
@@ -139,7 +133,7 @@ class PreRun:
         streaks = self.good_days.groupby('streak_id').filter(lambda x: len(x) >= streak)
         end_days = streaks.groupby('streak_id').last().reset_index(drop=True)
         
-        self.end_days = end_days
+        self.end_days_naive = end_days
 
         return end_days
                 
@@ -152,7 +146,7 @@ class PreRun:
         Returns:
             tuple[pd.DataFrame, pd.DataFrame]: A tuple containing the train and test dates in DataFrames
         """
-        if self.end_days is None:
+        if self.end_days_naive is None:
             raise ValueError("end_days is not calculated. Please calculate good end days before splitting into train and test.")
         
         self.end_days = self.end_days.sort_values('date').reset_index(drop=True)
@@ -208,9 +202,9 @@ class PreRun:
     
     def add_energy_features_only(self, 
                      daily_lags=0, 
-                     remove_daily_lags_nans=False,
+                     remove_daily_lags_nans=True,
                      include_last_year=False, 
-                     remove_last_year_nans=False,
+                     remove_last_year_nans=True,
                      todays_lags=0, 
                      remove_todays_lags_nans=False,
                      include_month=False,
@@ -245,7 +239,26 @@ class PreRun:
         df['time'] = pd.to_datetime(df['time'])
         df = df.sort_values('time').reset_index(drop=True)
         df["day"] = df["time"].dt.floor("D") # for aligning thing later. should drop.
-        
+        first_date = df['time'].min()
+        last_date = df['time'].max()
+        # temp add other times so that shifts work properly
+        old_times = set(df['time'].unique())
+        old_days = set(df['day'].unique())
+        df = df.set_index('time')
+        df = df.reindex(
+            pd.date_range(
+                start=pd.Timestamp(
+                    first_date.year, first_date.month, first_date.day, hour=0, tz=f'Etc/GMT+{-self.utc_offset}'
+                ),
+                end=pd.Timestamp(
+                    last_date.year, last_date.month, last_date.day, hour=23, tz=f'Etc/GMT+{-self.utc_offset}'
+                ),
+                freq='h'
+            ),
+            fill_value=0
+        )
+        # make sure days are updated.
+        df["day"] = df["time"].dt.floor("D") # for aligning thing later. should drop.
         #if we want to include last year's reading
         #creates two columns: 'last_year' and 'last_year_lag'. 'last_year' is the energy reading from the same time last year. 'last_year_lag' is the difference between the energy reading from the same time last year and the energy reading from the same time last year and a day. 
         # This is to try and offset daylight savings.
@@ -255,16 +268,11 @@ class PreRun:
             df_last_year = df[['time', 'energy']].copy()
             df_last_year['time'] = df_last_year['time'] + pd.DateOffset(years=1)
 
-            #will need to group by date, so make a date column
-            df_last_year['date'] = df_last_year['time'].dt.date
-            #make lag column of energy at previous hour reading from last year. also fill 0's.
-            df_last_year['lag'] = df_last_year.groupby('date')['energy'].shift(1).fillna(0)
-            #but actually want the difference
-            df_last_year['lag'] = df_last_year['energy'] - df_last_year['lag']
+            # add a column containing (last year) - (last year and a day)
+            df_last_year['lag'] = df_last_year['energy'] - df_last_year['energy'].shift(1)
 
             df_last_year = df_last_year.rename(columns={'energy': 'last_year', 'lag': 'last_year_minus_last_year_and_an_hour'})
 
-            df_last_year = df_last_year.drop(columns=['date'])
             # Merge
             df = df.merge(df_last_year, on='time', how='left')
 
@@ -274,11 +282,11 @@ class PreRun:
         #do daily lags: includes previous daily_lags days at exactly the same time
         if daily_lags>0:
             for i in range(1,daily_lags+1):
-                df_temp = self.data.copy()
-                df_temp['time'] = df_temp['time'] + pd.Timedelta(days=i)
-                df_temp.rename(columns = {'energy':f'{i}_days_ago'}, inplace=True)
-                df = df.merge(df_temp, on='time', how = 'left')
-                
+                # df_temp = self.data.copy()
+                # df_temp['time'] = df_temp['time'] + pd.Timedelta(days=1)
+                # df_temp.rename(columns = {'energy':f'daily_lag_{i}'}, inplace=True)
+                # df = df.merge(df_temp, on='time', how = 'left')
+                df[f"{i}_days_ago"] = (df.groupby(df["time"].dt.time)["energy"].shift(24 * i))
         
 
         #todays_lags -- previous readings from the same day. 
@@ -323,6 +331,10 @@ class PreRun:
 
         #remove 'day' column from amended_data
         self.amended_data = self.amended_data.drop(columns=['day'])
+
+        # return to existing times
+        df = df.reset_index()
+        df = df[df['time'].isin(old_times)]
         
         return df
 
@@ -338,7 +350,6 @@ class PreRun:
         self.amended_data = df
 
     def gather_weather_data(self):
-
         latitude = self.systems_cleaned['latitude'].iloc[0]
         longitude = self.systems_cleaned['longitude'].iloc[0]
         tilt = self.systems_cleaned['tilt'].iloc[0]
@@ -449,27 +460,3 @@ class PreRun:
         hourly_dataframe = hourly_dataframe.drop(columns=['date', 'sunrise', 'sunset'])
 
         return hourly_dataframe
-    
-    def custom_error(y_true, y_pred, a=1, b=2)->float:
-        """custom error to penalize overestimation. Like a weighted MSE.
-
-        Args:
-            y_true (Series): y_true
-            y_pred (Series): y_pred
-            a (int, optional): coefficient of underestimation. Defaults to 1.
-            b (int, optional): coefficient of overestimation. Defaults to 1.
-
-        Returns:
-            float: mean error
-        """
-        if a<0 or b<0:
-            raise ValueError("a and b must be non-negative")
-        elif a==0 and b==0:
-            raise ValueError("a and b cannot both be zero")
-        
-
-        Y = pd.DataFrame({'y_true': y_true.reset_index(drop=True), 'y_pred': y_pred.reset_index(drop=True)})
-        
-        Y['error'] = np.where(Y['y_true'] > Y['y_pred'], a * (Y['y_true'] - Y['y_pred'])**2, b * (Y['y_pred'] - Y['y_true'])**2)
-        
-        return Y['error'].mean()
