@@ -451,6 +451,7 @@ class PreRun:
 
         return hourly_dataframe
     
+class postRun:
     def custom_error(y_true, y_pred, a=1, b=2)->float:
         """custom error to penalize overestimation. Like a weighted MSE.
 
