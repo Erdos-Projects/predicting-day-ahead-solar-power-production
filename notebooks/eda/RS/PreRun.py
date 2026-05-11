@@ -135,14 +135,21 @@ class PreRun:
         """
         
         self.good_days = self.good_days.sort_values('date').reset_index(drop=True)
-        self.good_days['streak_id'] = (self.good_days['date'] - self.good_days['date'].shift(1) != timedelta(days=1)).cumsum()
-        print(self.good_days)
-        streaks = self.good_days.groupby('streak_id').filter(lambda x: len(x) >= streak)
-        end_days = streaks.groupby('streak_id').last().reset_index(drop=True)
-        
-        self.end_days_naive = end_days
+        # find the breaks in the streaks
+        break_streak = (self.good_days['date'] - self.good_days['date'].shift(1) != timedelta(days=1))
+        # assign a group id to each streak
+        self.good_days['streak_id'] = break_streak.cumsum()
+        # find which number a day is in its current streak
+        self.good_days['streak_len'] = self.good_days.groupby('streak_id').cumcount() + 1
+        # filter to only include days that are in a streak of length >= streak
+        self.end_days_naive = self.good_days[self.good_days['streak_len'] >= streak]
 
-        return end_days
+        #trim to only the date column
+        self.end_days_naive = self.end_days_naive[['date']].reset_index(drop=True)
+        self.good_days = self.good_days.drop(columns=['streak_id', 'streak_len'])
+        
+        
+        return self.end_days_naive
                 
     def naive_tts_dates_only(self, train = 0.8)->tuple[pd.DataFrame, pd.DataFrame]:
         """returns a DataFrame with the train and test split of the good end days based on the date only. The train set will contain the first 80% of the good end days and the test set will contain the last 20% of the good end days.
