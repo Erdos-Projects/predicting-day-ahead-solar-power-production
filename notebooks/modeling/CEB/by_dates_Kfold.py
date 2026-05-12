@@ -15,7 +15,7 @@ def k_fold_split(df: pd.DataFrame, good_ends, no_overlap: bool, n_splits: int):
     df_last_date = df['date'].max()
     if not isinstance(good_ends, pd.Series):
         good_ends = pd.Series(good_ends, name='good_ends')
-    good_ends = good_ends[good_ends  <= df_last_date]
+    good_ends = good_ends[good_ends <= df_last_date]
     if good_ends is None or len(good_ends) < n_splits:
         raise ValueError('Data has fewer good ends than the number of splits.')
     # draft values
@@ -36,9 +36,13 @@ def k_fold_split(df: pd.DataFrame, good_ends, no_overlap: bool, n_splits: int):
                         & (df['date'] < (current_end - timedelta(days=1)))
                     ]
                 else:
-                    df_from_one_day_before = df[df['date'] < (current_end - timedelta(days=1))]
+                    df_from_one_day_before = df[
+                        df['date'] < (current_end - timedelta(days=1))
+                    ]
             else:
-                df_from_one_day_before = df[df['date'] < (current_end - timedelta(days=1))]
+                df_from_one_day_before = df[
+                    df['date'] < (current_end - timedelta(days=1))
+                ]
             df_date = df[df['date'] == current_end]
             if not date_before:
                 df_date.drop(columns=['date',])
@@ -49,11 +53,13 @@ def k_fold_split(df: pd.DataFrame, good_ends, no_overlap: bool, n_splits: int):
     return splits_list
 
 
-def k_fold_split_option_a(df_train: pd.DataFrame, good_ends, n_splits: int, window_size, return_type):
+def k_fold_split_option_a(df_train: pd.DataFrame, good_ends,
+                          n_splits: int, window_size,
+                          front_or_back: str, return_type):
     '''Make k-fold split of days.
     If padded by 0's, and not too much missingness,
     comparable to TimeSeriesSplit(n_splits=n_splits, test_length=24, gap=24).
-    
+
     Parameters
     ------------
     df_train: pd.Dataframe
@@ -64,18 +70,34 @@ def k_fold_split_option_a(df_train: pd.DataFrame, good_ends, n_splits: int, wind
         Number of splits you want.  Defaults to the last few valid splits.
     window_size: int or None
         If int, only want window_size days of data (assuming it exist)
-        Warning: if you set streak = 7 in PreRun, window_size is only guaranteed to be 5. (because of the skipped day).
+        Warning: if you set streak = 7 in PreRun,
+        window_size is only guaranteed to be 5
+        (because of the skipped day).
         If None, take all earlier data.
+    front_or_back: str
+        If 'front', give the first n splits
+        If 'back', give the last n splits
+        If 'back_offset_one', give the splits from the back, but forward by one
+        (so that the last n splits can be the test indices).
+        If window_size is None, choose 'back' or 'back_but_one'
+        for best results.
     return_type: str
-        If return_type == 'index', return indices for the DataFrames test and split
-        (If data padded with 0's, this is more-or-less equivalent to TimeSeriesSplit(gap=24),)
+        If return_type == 'index', return indices for the
+        DataFrames train and validation
+        (If data padded with 0's, this is more-or-less equivalent
+        to sklearn.model_selection.TimeSeriesSplit(test_length=24, gap=24),)
         If return_type == 'DataFrame', return the DataFrame itself
-        *Warning*: return_type == 'index' is required to plug into GridSearchCV and similar!
-    
+        *Warning*: return_type == 'index' is required
+        to plug into GridSearchCV and similar!
+
     Returns:
     splits_list:  list[tuple[list, list]] | list[tuple[pandas.DataFrame, pandas.DataFrame]]
-        If return_type == 'index', just a list, where each list is a tuple (list of training indices, list of validation indices)
-        If return_type == 'DataFrame', each list is a DataFrame (list of training indices, list of validation indices)
+        If return_type == 'index', just a list,
+        where each element is a tuple
+        (list of training indices, list of validation indices)
+        If return_type == 'DataFrame',
+        each element of the outer list is a tuple
+        (training data, vailidation-day data)
     '''
     if 'date' not in df_train.columns:
         date_before = False
@@ -88,31 +110,48 @@ def k_fold_split_option_a(df_train: pd.DataFrame, good_ends, n_splits: int, wind
     df_last_date = df_train['date'].max()
     if not isinstance(good_ends, pd.Series):
         good_ends = pd.Series(good_ends, name='good_ends')
-    good_ends = good_ends[good_ends  <= df_last_date]
-    # if window_size is None, make sure we have a decent chunk of days to work with
+    good_ends = good_ends[good_ends <= df_last_date]
+    # if window_size is None, make sure we have a decent
+    # amount of information to work with
     if window_size is None:
         good_ends = good_ends[good_ends >= df_first_date + timedelta(days=50)]
     # if not enough splits, give a warning.
     if good_ends is None or len(good_ends) < n_splits:
         raise ValueError('Data has fewer good ends than the number of splits.')
     splits_list = []
-    current_start = 0
-    for _ in range(n_splits):
-        current_end = good_ends.at[current_start]
+    num_good_ends = len(good_ends)
+    for j in range(n_splits):
+        if front_or_back == 'front':
+            current_end = good_ends.at[j]
+        elif front_or_back == 'back':
+            current_end = good_ends.at[num_good_ends - n_splits + j]
+        elif front_or_back == 'back_offset_one':
+            current_end = good_ends.at[num_good_ends - n_splits - 1 + j]
+        else:
+            raise ValueError(
+                'front_or_back should be "front" or "back", '
+                + f'recieved {front_or_back}.'
+            )
         df_date = df_train[df_train['date'] == current_end]
         if window_size is not None:
             df_from_one_day_before = df_train[
-                (df_train['date'] >= current_end - timedelta(days = 1 + window_size))
+                (df_train['date'] >= current_end - timedelta(days=1 + window_size))
                 & (df_train['date'] < (current_end - timedelta(days=1)))
             ]
         else:
-            df_from_one_day_before = df_train[df_train['date'] < (current_end - timedelta(days=1))]
+            df_from_one_day_before = df_train[
+                df_train['date'] < (current_end - timedelta(days=1))
+            ]
         if not date_before:
             df_date.drop(columns=['date',])
             df_from_one_day_before.drop(columns=['date',])
         if return_type == 'index':
             splits_list.append((df_from_one_day_before.index, df_date.index))
         elif return_type == 'DataFrame':
-            splits_list.append((df_from_one_day_before.index, df_date.index))
+            splits_list.append((df_from_one_day_before, df_date))
+        else:
+            raise ValueError(
+                'return_type should be "index" or "DataFrame", '
+                + f'recieved {return_type}.'
+            )
     return splits_list
-    
