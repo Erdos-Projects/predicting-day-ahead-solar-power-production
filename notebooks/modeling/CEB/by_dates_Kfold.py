@@ -13,8 +13,15 @@ def k_fold_split(df: pd.DataFrame, good_ends, no_overlap: bool, n_splits: int):
     # make sure good_days and good_ends are localized to the current dataset
     # (possibly training/testing mismatch, etc.)
     df_last_date = df['date'].max()
-    if not isinstance(good_ends, pd.Series):
-        good_ends = pd.Series(good_ends, name='good_ends')
+    if isinstance(good_ends, pd.DataFrame):
+        good_ends = good_ends['date']
+    elif isinstance(good_ends, list):
+        good_ends = pd.Series(good_ends, name='date')
+    # make sure that entries are datetime.date objects
+    # rather than pd.Timestamp objects
+    # to match the output of df_train['date'] above
+    if isinstance(good_ends.iloc[0], pd.Timestamp):
+        good_ends = good_ends.dt.date
     good_ends = good_ends[good_ends <= df_last_date]
     if good_ends is None or len(good_ends) < n_splits:
         raise ValueError('Data has fewer good ends than the number of splits.')
@@ -108,8 +115,16 @@ def k_fold_split_option_a(df_train: pd.DataFrame, good_ends,
     # (possibly training/testing mismatch, etc.)
     df_first_date = df_train['date'].min()
     df_last_date = df_train['date'].max()
-    if not isinstance(good_ends, pd.Series):
-        good_ends = pd.Series(good_ends, name='good_ends')
+    # convert good_ends to pandas.Series object
+    if isinstance(good_ends, pd.DataFrame):
+        good_ends = good_ends['date']
+    elif isinstance(good_ends, list):
+        good_ends = pd.Series(good_ends, name='date')
+    # make sure that entries are datetime.date objects
+    # rather than pd.Timestamp objects
+    # to match the entries of df_train['date'] above
+    if isinstance(good_ends.iloc[0], pd.Timestamp):
+        good_ends = good_ends.dt.date
     good_ends = good_ends[good_ends <= df_last_date]
     # if window_size is None, make sure we have a decent
     # amount of information to work with
@@ -118,19 +133,21 @@ def k_fold_split_option_a(df_train: pd.DataFrame, good_ends,
     # if not enough splits, give a warning.
     if good_ends is None or len(good_ends) < n_splits:
         raise ValueError('Data has fewer good ends than the number of splits.')
+    start_ind = good_ends.index[0]
+    end_ind = good_ends.index[-1]
     splits_list = []
-    num_good_ends = len(good_ends)
     for j in range(n_splits):
         if front_or_back == 'front':
-            current_end = good_ends.at[j]
+            current_end = good_ends.at[start_ind + j]
         elif front_or_back == 'back':
-            current_end = good_ends.at[num_good_ends - n_splits + j]
+            current_end = good_ends.at[end_ind - n_splits + 1 + j]
         elif front_or_back == 'back_offset_one':
-            current_end = good_ends.at[num_good_ends - n_splits - 1 + j]
+            current_end = good_ends.at[end_ind - n_splits + j]
         else:
             raise ValueError(
-                'front_or_back should be "front" or "back", '
-                + f'recieved {front_or_back}.'
+                'front_or_back should be "front", "back", '
+                + 'or "back_offset".\n'
+                + f'Recieved {front_or_back}.'
             )
         df_date = df_train[df_train['date'] == current_end]
         if window_size is not None:
@@ -146,7 +163,8 @@ def k_fold_split_option_a(df_train: pd.DataFrame, good_ends,
             df_date.drop(columns=['date',])
             df_from_one_day_before.drop(columns=['date',])
         if return_type == 'index':
-            splits_list.append((df_from_one_day_before.index, df_date.index))
+            splits_list.append((df_from_one_day_before.index,
+                                df_date.index))
         elif return_type == 'DataFrame':
             splits_list.append((df_from_one_day_before, df_date))
         else:
