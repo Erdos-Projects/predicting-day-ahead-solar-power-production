@@ -1,5 +1,4 @@
 from time import strftime
-
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
@@ -219,8 +218,6 @@ class PreRun:
                      remove_daily_lags_nans=False,
                      include_last_year=False, 
                      remove_last_year_nans=False,
-                     todays_lags=0, 
-                     remove_todays_lags_nans=False,
                      include_month=False,
                      include_hour = False,
                      include_hour_cyclic=False,
@@ -300,9 +297,9 @@ class PreRun:
 
         #remove nans if specified.
         if remove_last_year_nans:
-            df = df.dropna(subset=['last_year', 'last_year_minus_last_year_and_an_hour']).reset_index(drop=True)
+            df = df.dropna(subset=['last_year']).reset_index(drop=True)
         if remove_daily_lags_nans:
-            df = df.dropna(subset=[f"{i}_days_ago" for i in range(1,daily_lags+1)]).reset_index(drop=True)
+            df = df.dropna(subset=[f"{i}_days_ago" for i in range(2,daily_lags+1)]).reset_index(drop=True)
         # if remove_todays_lags_nans: #this HAS to come after the others since we might want to keep these nans
         #     df = df.dropna(subset=[f'{i}_hours_ago_today' for i in range(1,todays_lags+1)]).reset_index(drop=True)
 
