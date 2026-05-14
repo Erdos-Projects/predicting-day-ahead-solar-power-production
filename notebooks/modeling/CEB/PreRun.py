@@ -1,5 +1,4 @@
 from time import strftime
-
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
@@ -219,8 +218,6 @@ class PreRun:
                      remove_daily_lags_nans=False,
                      include_last_year=False, 
                      remove_last_year_nans=False,
-                     todays_lags=0, 
-                     remove_todays_lags_nans=False,
                      include_month=False,
                      include_hour = False,
                      include_hour_cyclic=False,
@@ -265,12 +262,12 @@ class PreRun:
 
             #will need to group by date, so make a date column
             df_last_year['date'] = df_last_year['time'].dt.date
-            #make lag column of energy at previous hour reading from last year. also fill 0's.
-            df_last_year['lag'] = df_last_year.groupby('date')['energy'].shift(1).fillna(0)
-            #but actually want the difference
-            df_last_year['lag'] = df_last_year['energy'] - df_last_year['lag']
+            # #make lag column of energy at previous hour reading from last year. also fill 0's.
+            # df_last_year['lag'] = df_last_year.groupby('date')['energy'].shift(1).fillna(0)
+            # #but actually want the difference
+            # df_last_year['lag'] = df_last_year['energy'] - df_last_year['lag']
 
-            df_last_year = df_last_year.rename(columns={'energy': 'last_year', 'lag': 'last_year_minus_last_year_and_an_hour'})
+            df_last_year = df_last_year.rename(columns={'energy': 'last_year'})
 
             df_last_year = df_last_year.drop(columns=['date'])
             # Merge
@@ -280,8 +277,8 @@ class PreRun:
         
 
         #do daily lags: includes previous daily_lags days at exactly the same time
-        if daily_lags>0:
-            for i in range(1,daily_lags+1):
+        if daily_lags>1:
+            for i in range(2,daily_lags+1):
                 df_temp = self.data.copy()
                 df_temp['time'] = df_temp['time'] + pd.Timedelta(days=i)
                 df_temp.rename(columns = {'energy':f'{i}_days_ago'}, inplace=True)
@@ -290,21 +287,21 @@ class PreRun:
         
 
         #todays_lags -- previous readings from the same day. 
-        if todays_lags>0:
-            for i in range(1,todays_lags+1):
-                # df_temp = self.data.copy()
-                # df_temp['energy'] = df_temp['energy'].shift(1)
-                # df_temp.rename(columns = {'energy':f'{i}_hours_ago_today'}, inplace=True)
-                # df = df.merge(df_temp, on='time', how = 'left')
-                df[f'{i}_hours_ago_today'] = df.groupby(df['time'].dt.floor('D'))['energy'].shift(i)
+        # if todays_lags>0:
+        #     for i in range(1,todays_lags+1):
+        #         # df_temp = self.data.copy()
+        #         # df_temp['energy'] = df_temp['energy'].shift(1)
+        #         # df_temp.rename(columns = {'energy':f'{i}_hours_ago_today'}, inplace=True)
+        #         # df = df.merge(df_temp, on='time', how = 'left')
+        #         df[f'{i}_hours_ago_today'] = df.groupby(df['time'].dt.floor('D'))['energy'].shift(i)
 
         #remove nans if specified.
         if remove_last_year_nans:
-            df = df.dropna(subset=['last_year', 'last_year_minus_last_year_and_an_hour']).reset_index(drop=True)
+            df = df.dropna(subset=['last_year']).reset_index(drop=True)
         if remove_daily_lags_nans:
-            df = df.dropna(subset=[f"{i}_days_ago" for i in range(1,daily_lags+1)]).reset_index(drop=True)
-        if remove_todays_lags_nans: #this HAS to come after the others since we might want to keep these nans
-            df = df.dropna(subset=[f'{i}_hours_ago_today' for i in range(1,todays_lags+1)]).reset_index(drop=True)
+            df = df.dropna(subset=[f"{i}_days_ago" for i in range(2,daily_lags+1)]).reset_index(drop=True)
+        # if remove_todays_lags_nans: #this HAS to come after the others since we might want to keep these nans
+        #     df = df.dropna(subset=[f'{i}_hours_ago_today' for i in range(1,todays_lags+1)]).reset_index(drop=True)
 
         if include_month:
             df['month'] = df['time'].dt.month
@@ -458,7 +455,7 @@ class PreRun:
 
         return hourly_dataframe
     
-class postRun:
+class PostRun:
     def custom_error(y_true, y_pred, a=1, b=2)->float:
         """custom error to penalize overestimation. Like a weighted MSE.
 
@@ -477,8 +474,13 @@ class postRun:
             raise ValueError("a and b cannot both be zero")
         
 
-        Y = pd.DataFrame({'y_true': y_true.reset_index(drop=True), 'y_pred': y_pred.reset_index(drop=True)})
-        
-        Y['error'] = np.where(Y['y_true'] > Y['y_pred'], a * (Y['y_true'] - Y['y_pred'])**2, b * (Y['y_pred'] - Y['y_true'])**2)
-        
-        return Y['error'].mean()
+        Y_true = np.asarray(y_true)
+        Y_pred = np.asarray(y_pred)
+
+        diff = Y_true - Y_pred
+
+        return np.mean(
+            np.where(diff > 0,
+                    a * diff**2,        # underestimation
+                    b * diff**2)        # overestimation
+        )
