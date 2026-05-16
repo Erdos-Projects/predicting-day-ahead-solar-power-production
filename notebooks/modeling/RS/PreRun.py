@@ -6,6 +6,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import date, datetime, timedelta
+from dateutil.relativedelta import relativedelta
 from itertools import product
 from copy import deepcopy
 import requests_cache
@@ -87,7 +88,16 @@ class PreRun:
         """
         # Load all parquet files in the directory
         folder = Path(self.path)
-        requested_pq = pq.ParquetDataset(folder)
+        #requested_pq = pq.ParquetDataset(folder)
+
+        try:
+            requested_pq = pq.ParquetDataset(folder)
+            df = requested_pq.read().to_pandas()
+        except (FileNotFoundError, OSError):
+            self.data = None
+            self.amended_data = None
+            return
+        
         self.data = requested_pq.read().to_pandas()
         # print(self.data.columns)
         self.data = self.data[['time', 'energy']]
@@ -149,24 +159,6 @@ class PreRun:
         
         
         return self.end_days_naive
-                
-    def naive_tts_dates_only(self, train = 0.8)->tuple[pd.DataFrame, pd.DataFrame]:
-        """returns a DataFrame with the train and test split of the good end days based on the date only. The train set will contain the first 80% of the good end days and the test set will contain the last 20% of the good end days.
-
-        Args:
-            train (float, optional): proportion of good end days to include in the train set. Defaults to 0.8.
-
-        Returns:
-            tuple[pd.DataFrame, pd.DataFrame]: A tuple containing the train and test dates in DataFrames
-        """
-        if self.end_days_naive is None:
-            raise ValueError("end_days is not calculated. Please calculate good end days before splitting into train and test.")
-        
-        self.end_days = self.end_days.sort_values('date').reset_index(drop=True)
-        split_index = int(len(self.end_days) * train)
-        train_dates = self.end_days.iloc[:split_index].reset_index(drop=True)
-        test_dates = self.end_days.iloc[split_index:].reset_index(drop=True)
-        return train_dates, test_dates
     
     def data_until_ho_day(self, ho_day: pd.Timestamp) -> pd.DataFrame:
         """returns a DataFrame of all data (updated to include features) until the given ho_day (inclusive)
@@ -180,7 +172,7 @@ class PreRun:
         if self.data is None:
             raise ValueError("data is not loaded. Please load data before filtering by ho_day.")
         
-        filtered_data = self.amended_data[self.amended_data['date'] <= ho_day].reset_index(drop=True)
+        filtered_data = self.amended_data[self.amended_data['time'] <= ho_day.normalize()].reset_index(drop=True)
         return filtered_data
     
     def fill_missing_hours(self, fill_value=0):
@@ -391,6 +383,9 @@ class PreRun:
             inclusive = "left"
         )}
 
+        hourly_global_tilted_irradiance = np.roll(hourly_global_tilted_irradiance, -1)
+        hourly_global_tilted_irradiance[-1] = 0
+
         hourly_data["cloud_cover"] = hourly_cloud_cover
         hourly_data["global_tilted_irradiance"] = hourly_global_tilted_irradiance
 
@@ -449,12 +444,30 @@ class PreRun:
         overlap = (overlap_end - overlap_start).dt.total_seconds()
         # convert to proportion of hour
         hourly_dataframe['proportion_daytime'] = np.clip(overlap / 3600, 0, 1)
+        
 
         # remove unnecessary columns
         hourly_dataframe = hourly_dataframe.drop(columns=['date', 'sunrise', 'sunset'])
 
         return hourly_dataframe
     
+    def tts_of_data_using_end_days(self, remove_first_year = True, train_proportion = 0.8):
+        
+        #only the dates
+        self.end_days = self.end_days_naive.copy()
+        if remove_first_year:
+            first_day = (self.good_days.loc[0, 'date'])
+            remove_until = first_day + timedelta(days=365)
+            self.end_days_trimmed = self.end_days.loc[self.end_days['date']>=remove_until].reset_index(drop=True)
+        else:
+            self.end_days_trimmed = self.end_days
+
+        split_day = self.end_days_trimmed.loc[int(train_proportion*len(self.end_days_trimmed)), 'date']
+        self.train_dates = self.end_days_trimmed.loc[self.end_days['date']<split_day]
+        self.test_dates = self.end_days_trimmed.loc[self.end_days['date']>=split_day]
+
+        
+
 class PostRun:
     def custom_error(y_true, y_pred, a=1, b=2)->float:
         """custom error to penalize overestimation. Like a weighted MSE.
