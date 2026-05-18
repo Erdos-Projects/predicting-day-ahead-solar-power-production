@@ -323,15 +323,34 @@ class PreRun:
         
         return df
 
-    def add_weather_features_only(self):
+    def add_weather_features_only(self, download_weather=False):
         """adds weather features (cloud cover proportion and global tilted irradiance)
+        
+        Args:
+            download_weather (bool, optional): if True, download and overwrite weather data. Defaults to False.
         """
-        #get weather data
-        weather_data = self.gather_weather_data()
+        # Check if weather data file exists
+        weather_file_path = Path('weather_data') / f'{self.system_id}_{self.meter_or_inverter}_weather_data.csv'
+        
+        # Load or download weather data
+        if weather_file_path.exists() and not download_weather:
+            # Load from CSV
+            weather_data = pd.read_csv(weather_file_path)
+            weather_data['time'] = pd.to_datetime(weather_data['time'])
+        else:
+            # Download weather data
+            weather_data = self.gather_weather_data()
+            # Create directory if it doesn't exist
+            weather_file_path.parent.mkdir(parents=True, exist_ok=True)
+            # Save to CSV
+            weather_data.to_csv(weather_file_path, index=False)
+        
+        # #get weather data
+        # weather_data = self.gather_weather_data()
         #merge with energy data
         df = self.amended_data.copy()
         df = df.merge(weather_data, left_on='time', right_on='time', how='left')
-        #df.dropna(inplace=True) #might drop too many things
+        # #df.dropna(inplace=True) #might drop too many things
         self.amended_data = df
 
     def gather_weather_data(self):
