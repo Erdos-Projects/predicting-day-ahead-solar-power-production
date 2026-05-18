@@ -341,7 +341,8 @@ class PreRun:
         tilt = self.systems_cleaned['tilt'].iloc[0]
         azimuth = (self.systems_cleaned['azimuth'].iloc[0]%360) - 180 
         start_date = self.good_days['date'].min().strftime('%Y-%m-%d')
-        end_date = self.good_days['date'].max().strftime('%Y-%m-%d')
+        end_date = (self.good_days['date'].max() + pd.Timedelta(days=1)).strftime('%Y-%m-%d')
+        #self.good_days['date'].max().strftime('%Y-%m-%d')
         
         # Setup the Open-Meteo API client with cache and retry on error
         cache_session = requests_cache.CachedSession('.cache', expire_after = -1)
