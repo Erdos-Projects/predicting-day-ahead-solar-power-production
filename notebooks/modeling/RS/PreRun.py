@@ -213,6 +213,7 @@ class PreRun:
                      include_month=False,
                      include_hour = False,
                      include_hour_cyclic=False,
+                     highest_fourier_term_hour=0,
                      include_month_cyclic=False,
                      include_day_of_year_cyclic=False) -> pd.DataFrame:
         """creates the dataframe of features
@@ -232,6 +233,7 @@ class PreRun:
             include_month (bool, optional): whether to include the month feature. Defaults to False.
             include_hour (bool, optional): whether to include the hour feature. Defaults to False.
             include_hour_cyclic (bool, optional): makes the hour feature cyclic. Defaults to False.
+            highest_fourier_term_hour (int, optional): higher order fourier terms for encoding time of day. Deafaults to 0.
             include_month_cyclic (bool, optional): makes the month feature cyclic. Defaults to False.
             include_day_of_year_cyclic (bool, optional): makes the day of the year feature cyclic. Defaults to False.
 
@@ -309,9 +311,16 @@ class PreRun:
         
         if include_hour:
             df['hour'] = df['time'].dt.hour
+
+        if highest_fourier_term_hour>0:
+            include_hour_cyclic = False
         if include_hour_cyclic:
             df['hour_sin'] = np.sin((2 * np.pi * df['time'].dt.hour) / 24)
             df['hour_cos'] = np.cos((2 * np.pi * df['time'].dt.hour) / 24)
+
+        for i in range(1,highest_fourier_term_hour+1):
+            df[f'hourly_fourier_term_{i}_sin'] = np.sin((2 * i * np.pi * df['time'].dt.hour) / 24)
+            df[f'hourly_fourier_term_{i}_cos'] = np.cos((2 * i * np.pi * df['time'].dt.hour) / 24)
 
         self.amended_data = df
 
