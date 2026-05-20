@@ -1,0 +1,90 @@
+4-other
+Good ends count: 1127
+Good days count: 3598
+Ratio: 31.32296%
+
+10-other
+Good ends count: 891
+Good days count: 4170
+Ratio: 21.36691%
+
+33-other
+Good ends count: 1484
+Good days count: 3594
+Ratio: 41.29104%
+
+36-other
+Good ends count: 358
+Good days count: 1510
+Ratio: 23.70861%
+
+50-other
+Good ends count: 2062
+Good days count: 5817
+Ratio: 35.44783%
+
+51-other
+Good ends count: 1784
+Good days count: 5644
+Ratio: 31.60879%
+
+1199-inverter
+Good ends count: 828
+Good days count: 2275
+Ratio: 36.39560%
+
+1204-inverter
+Good ends count: 428
+Good days count: 1164
+Ratio: 36.76976%
+
+1283-inverter
+Good ends count: 857
+Good days count: 2124
+Ratio: 40.34840%
+
+1283-meter
+Good ends count: 864
+Good days count: 2136
+Ratio: 40.44944%
+
+1284-other
+Good ends count: 177
+Good days count: 746
+Ratio: 23.72654%
+
+1289-other
+Good ends count: 322
+Good days count: 1774
+Ratio: 18.15107%
+
+1332-inverter
+Good ends count: 110
+Good days count: 310
+Ratio: 35.48387%
+
+1332-meter
+Good ends count: 937
+Good days count: 2185
+Ratio: 42.88330%
+
+4902-inverter
+Good ends count: 374
+Good days count: 975
+Ratio: 38.35897%
+
+4902-meter
+Good ends count: 394
+Good days count: 1047
+Ratio: 37.63133%
+
+4903-inverter
+Good ends count: 427
+Good days count: 1039
+Ratio: 41.09721%
+
+4903-meter
+Good ends count: 452
+Good days count: 1049
+Ratio: 43.08866%
+

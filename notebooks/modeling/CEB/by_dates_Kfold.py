@@ -63,7 +63,8 @@ def k_fold_split(df: pd.DataFrame, good_ends, no_overlap: bool, n_splits: int):
 def k_fold_split_option_a(df_train: pd.DataFrame, good_ends,
                           n_splits, window_size,
                           front_or_back: str, gap_day: bool,
-                          return_type: str):
+                          return_type: str,
+                          sample_spacing: int = 1):
     '''Make k-fold split of days.
     If padded by 0's, and not too much missingness,
     comparable to TimeSeriesSplit(n_splits=n_splits, test_length=24, gap=24).
@@ -102,6 +103,8 @@ def k_fold_split_option_a(df_train: pd.DataFrame, good_ends,
         If return_type == 'DataFrame', return the DataFrame itself
         *Warning*: return_type == 'index' is required
         to plug into GridSearchCV and similar!
+    sample_spacing: int, default 1
+        If sample_spacing = n > 1, returns every nth sample group (just to cut down the size a little)
 
     Returns:
     splits_list:  list[tuple[list, list]] | list[tuple[pandas.DataFrame, pandas.DataFrame]]
@@ -184,4 +187,7 @@ def k_fold_split_option_a(df_train: pd.DataFrame, good_ends,
                 'return_type should be "index" or "DataFrame", '
                 + f'recieved {return_type}.'
             )
-    return splits_list
+    if sample_spacing == 1:
+        return splits_list
+    else:
+        return splits_list[::sample_spacing]
