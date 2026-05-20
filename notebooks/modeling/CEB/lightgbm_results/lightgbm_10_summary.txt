@@ -1,0 +1,75 @@
+System 10, gradient boosting with lightgbm
+           Day 0    Day 200  per_model_mean  per_model_std
+count  72.000000  72.000000       72.000000      72.000000
+mean    0.082808   0.001471        0.039897       0.039389
+std     0.008679   0.000357        0.000571       0.001863
+min     0.067765   0.000986        0.039082       0.036451
+25%     0.077364   0.001293        0.039576       0.038308
+50%     0.082809   0.001383        0.039752       0.039093
+75%     0.087264   0.001508        0.040052       0.040121
+max     0.102716   0.003078        0.041505       0.045140
+
+num_leaves
+num_leaves Effect on mean error
+                mean       std
+num_leaves                    
+7           0.039712  0.000110
+15          0.039907  0.000463
+31          0.040071  0.000844
+num_leaves Effect on st.dev. of error
+                mean       std
+num_leaves                    
+7           0.037966  0.001010
+15          0.039954  0.002082
+31          0.040248  0.001465
+
+max_depth
+max_depth Effect on mean error
+               mean       std
+max_depth                    
+-1         0.039973  0.000704
+ 5         0.039969  0.000607
+ 7         0.039747  0.000326
+max_depth Effect on st.dev. of error
+               mean       std
+max_depth                    
+-1         0.039485  0.001851
+ 5         0.039738  0.002275
+ 7         0.038944  0.001331
+
+learning_rate
+learning_rate Effect on mean error
+                   mean       std
+learning_rate                    
+0.1            0.039559  0.000241
+0.2            0.040234  0.000607
+learning_rate Effect on st.dev. of error
+                   mean       std
+learning_rate                    
+0.1            0.038403  0.001227
+0.2            0.040375  0.001881
+
+subsample
+subsample Effect on mean error
+               mean       std
+subsample                    
+0.8        0.039897  0.000575
+1.0        0.039897  0.000575
+subsample Effect on st.dev. of error
+               mean       std
+subsample                    
+0.8        0.039389  0.001877
+1.0        0.039389  0.001877
+
+colsample_bytree
+colsample_bytree Effect on mean error
+                      mean       std
+colsample_bytree                    
+0.8               0.039747  0.000488
+1.0               0.040046  0.000614
+colsample_bytree Effect on st.dev. of error
+                      mean       std
+colsample_bytree                    
+0.8               0.038677  0.001500
+1.0               0.040101  0.001937
+
