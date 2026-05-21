@@ -11,13 +11,13 @@ The presumed base folder is `src/data/` in the GitHub folder, unless otherwise s
 * `json`
 * `pyarrow`
 * `tqdm` (nice progress bar)
-* 
+* `pvlib` (for optional additional diagrams)
 
 
 ## Grab all the metadata and PVDAQ data.
 
 1. Run `metadata_downloader.py`.  Saves metadata to the GitHub, in `../../data/raw/(subfolders)`.
-2. Run `all_parquet_downloader.py`  Saves outside the GitHub Folder (space reasons -- approx. 17.5 GB of data), to `../../../data_ds_project/systems/parquet/`.
+2. Run `all_parquet_downloader.py`  Saves outside the GitHub Folder (space reasons -- approx. 17.5 GB of data), to `../../../data_ds_project/systems/parquet/`.  See [Parquet Downloader Guide](parquet_downloader_guide.md) if there is any issue.  
 3. Run `prize_downloader.py` and run the cells in `prize_downloader_specific.ipynb`.  Saves outside the GitHub Folder to `../../../data_ds_project/systems/prize/` (about 10 GB on-disk)
 
 
@@ -41,3 +41,8 @@ The presumed base folder is `src/data/` in the GitHub folder, unless otherwise s
 1.  Open `./pwr/ac_power_parquet_distiller_yearly.py`.  Make sure the full range of inputs is given in the start_index and end_index rules (lines 18-19), and the `parquet` save-type.
 2.  Save and run the self-same file.  This will extract time and aggregate-power statistics from `../../../data_ds_project/systems/parquet/` for each *nice* parquet-saved system (at least 2 years' worth of AC power data), standardizing to kilowatts and removing some obvious outliers.  For each 'good' systems, we end up with a set of parquet files from a Pandas DataFrame (stratified by year) with `time` as the first column,  column, and `ac_power_kW` (appended by source type -- inverter, meter, or '' for unknown) as the middle columns, and `year` as the last column (need to add a year column to divide up the Parquet files by it).  Saves to `../../../data_ds_project/testing_yearly_parquet/` by default.
 
+## Optional -- Grab full NSRDB data for last picture information
+
+Prior ideas (using NSRDB satellites more) encouraged us to do the full NSRDB download, back when we have 80 sites.
+
+1.  Run `nsrdb_irradiance_full_downloader.py`.  
