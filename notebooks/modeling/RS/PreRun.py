@@ -172,7 +172,9 @@ class PreRun:
         if self.data is None:
             raise ValueError("data is not loaded. Please load data before filtering by ho_day.")
         
-        filtered_data = self.amended_data[self.amended_data['time'] <= ho_day.normalize()].reset_index(drop=True)
+        filtered_data = self.amended_data[
+            self.amended_data['time'] < ho_day.normalize() + pd.Timedelta(hours=24)
+        ].reset_index(drop=True)
         return filtered_data
     
     def fill_missing_hours(self, fill_value=0):
