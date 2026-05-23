@@ -2,11 +2,14 @@ import pandas as pd
 import pyarrow.parquet as pq
 from clean_and_collect_power_data import Clean
 
+# choices -- do not alter unless you know what you are doing
 systems_cleaned = pd.read_csv('../../../data/core/systems_cleaned.csv')
 access_base = '../../../../data_ds_project/testing_yearly_parquet/'
-write_base = './clean_again/'
+write_base = '../../../../data_ds_project/parquet-cleaned-energy/'
 met_or_inv_choices = ('inverter', 'meter', None)
 
+# manually collated systems.
+# See ../../../src/data/weather/timezones_mk_two.ipynb for more information.
 good_timezone_systems = [4, 10, 33, 36, 50, 51, 1199, 1204, 1283,
                          1284, 1289, 1332, 4902, 4903]
 
