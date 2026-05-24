@@ -1,4 +1,4 @@
-The pvdaq_access package (modified for the downloader code)
+The pvdaq_access package (modified for the downloader_mk_two function)
 was licensed under the BSD 3-Clause License, reproduced below.
 
 BSD 3-Clause License

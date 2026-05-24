@@ -14,7 +14,7 @@ The presumed base folder is `src/data/` in the GitHub folder, unless otherwise s
 * `pvlib` (for optional objective at end)
 
 
-## Grab all the metadata and PVDAQ data.
+## Download all the metadata and PVDAQ data.
 
 1. Run `metadata_downloader.py`.  Saves metadata to the GitHub, in `../../data/raw/(subfolders)`.
 2. Run `all_parquet_downloader.py`  Saves outside the GitHub Folder (space reasons -- approx. 17.5 GB of data), to `../../../data_ds_project/systems/parquet/`.  See [Parquet Downloader Guide](parquet_downloader_guide.md) if there is any issue.  
