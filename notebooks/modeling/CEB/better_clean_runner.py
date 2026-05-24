@@ -5,7 +5,7 @@ from clean_and_collect_power_data import Clean
 # choices -- do not alter unless you know what you are doing
 systems_cleaned = pd.read_csv('../../../data/core/systems_cleaned.csv')
 access_base = '../../../../data_ds_project/testing_yearly_parquet/'
-write_base = '../../../../data_ds_project/parquet-cleaned-energy/'
+write_base = '../../../../data_ds_project/parquet_cleaned_energy/'
 met_or_inv_choices = ('inverter', 'meter', None)
 
 # manually collated systems.
