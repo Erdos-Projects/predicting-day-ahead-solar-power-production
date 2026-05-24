@@ -18,7 +18,7 @@ The presumed base folder is `src/data/` in the GitHub folder, unless otherwise s
 
 1. Run `metadata_downloader.py`.  Saves metadata to the GitHub, in `../../data/raw/(subfolders)`.
 2. Run `all_parquet_downloader.py`  Saves outside the GitHub Folder (space reasons -- approx. 17.5 GB of data), to `../../../data_ds_project/systems/parquet/`.  See [Parquet Downloader Guide](parquet_downloader_guide.md) if there is any issue.  
-3. Run `prize_downloader.py` and run the cells in `prize_downloader_specific.ipynb`.  Saves outside the GitHub Folder to `../../../data_ds_project/systems/prize/` (about 10 GB on-disk)
+3. (Optional until re-incorporated!) Run `prize_downloader.py` and run the cells in `prize_downloader_specific.ipynb`.  Saves outside the GitHub Folder to `../../../data_ds_project/systems/prize/` (about 10 GB on-disk)
 
 
 ## Clean up the systems metadata.
