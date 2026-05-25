@@ -74,7 +74,7 @@ download_modeling_only:  ## only downloads good-timezone systems.
 	$(PYRUNNER) narrow_nsrdb_irradiance_sampler.py
 	cd ..$(PATHSEP)..
 
-.PHONY: metadata_modeling_only:
+.PHONY: metadata_modeling_only
 metadata_modeling_only: download_modeling_only  ## Download extended metadata only for good-timezone systems.
     cd src$(PATHSEP)data
 	$(PYRUNNER) narrow_systems_better_sample_year.py
@@ -84,7 +84,7 @@ metadata_modeling_only: download_modeling_only  ## Download extended metadata on
 	cd ..$(PATHSEP)..
 
 .PHONY: extract_and_clean_modeling_only
-extract_and_clean_modeling_only: metadata_modeling_only  ## extract and standardize Power Data, convert to energy data
+extract_and_clean_modeling_only: metadata_modeling_only  ## extract and standardize Power Data, for good-timezone systems, convert to energy data
     cd src$(PATHSEP)data$(PATHSEP)pwr 
 	$(PYRUNNER) narrow_ac_power_parquet_distiller_yearly.py
 	cd ..$(PATHSEP)..$(PATHSEP)..
@@ -92,3 +92,23 @@ extract_and_clean_modeling_only: metadata_modeling_only  ## extract and standard
 	$(PYRUNNER) better_clean_runner.py
 	cd ..$(PATHSEP)..$(PATHSEP)..
 
+.PHONY: all_modeling_runs
+all_modeling_runs: ## run all modeling files.
+    ## Requires one of extract_and_clean_all, extract_and_clean_modeling_only
+    cd notebooks$(PATHSEP)modeling$(PATHSEP)RS 
+	jupyter nbconvert --to notebook --execute naive_energy_forecaster.ipynb
+	jupyter nbconvert --to notebook --execute linear_regression.ipynb
+	jupyter nbconvert --to notebook --execute prophet.ipynb
+	jupyter nbconvert --to notebook --execute sarimax.ipynb
+	cd ..
+	cd CEB
+	jupyter nbconvert --to notebook --execute better_lightgbm_results.ipynb
+	jupyter nbconvert --to notebook --execute xgboosting.ipynb
+	cd ..$(PATHSEP)..$(PATHSEP)..
+
+.PHONY: final_modeling_summaries
+final_modeling_summaries: all_modeling_runs ## run conclusory files
+    cd notebooks$(PATHSEP)modeling
+	jupyter nbconvert --to notebook --execute training_scores_comparison.ipynb
+	jupyter nbconvert --to notebook --execute final_results.ipynb
+	cd ..$(PATHSEP)..

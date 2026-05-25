@@ -42,7 +42,7 @@ The raw data is too large to fit in the GitHub.  For example, we need almost 10 
 
 ### Complication -- lots of preprocessing
 
-There is a great deal of preprocessing needed to get the data into a usable state, not least of which are standardizing the units and variable names, catching changes in variable scale, integrating power measurements into hourly energy production, and restricting to high-quality-data days.  See [Build Order Instructions](src\data\build_order.md) for the universal preprocessing steps, or simply take the end-result data from the courtesy copy located in [data\parquet_cleaned_energy](data/parquet_cleaned_energy/).  After that, use the [PreRun class](notebooks/modeling/RS/PreRun.py) for more localized before-modeling steps, including the integration of the OpenMeteo data.
+There is a great deal of preprocessing needed to get the data into a usable state, not least of which are standardizing the units and variable names, catching changes in variable scale, integrating power measurements into hourly energy production, and restricting to high-quality-data days.  See [Build Order Instructions](src\data\build_order.md) or [Makefile](Makefile) for the universal preprocessing steps, or simply take the end-result data from the courtesy copy located in [data\parquet_cleaned_energy](data/parquet_cleaned_energy/).  After that, use the [PreRun class](notebooks/modeling/RS/PreRun.py) for more localized before-modeling steps, including the integration of the OpenMeteo data.
 
 ## Modeling approach
 
