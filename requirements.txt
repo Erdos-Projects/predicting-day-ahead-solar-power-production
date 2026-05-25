@@ -15,7 +15,7 @@ requests
 requests_cache
 retry_requests
 openmeteo_requests
-sklearn
+scikit-learn
 lightgbm
 xgboost
 prophet
