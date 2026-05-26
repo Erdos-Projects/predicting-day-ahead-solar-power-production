@@ -146,18 +146,25 @@ extract_and_clean_modeling_only: download_power_modeling_only metadata_compiler_
 	$(PYRUNNER) better_clean_runner.py && \
 	cd ../../..
 
+.PHONY: one_ipynb
+one_ipynb: ## Requires one of extract_and_clean_modeling_only, extract_and_clean_all 
+    ## extract and standardize Power Data, convert to energy data
+	cd notebooks/modeling/RS && \
+	jupyter nbconvert --to notebook --execute "naive energy forecaster.ipynb" && \
+	cd ../../..
+
 .PHONY: all_modeling_runs
 all_modeling_runs: ## Requires one of extract_and_clean_modeling_only, extract_and_clean_all
     ## Run all modeling notebooks/scripts.
 	cd notebooks/modeling/RS && \
-	jupyter nbconvert --to notebook --execute naive_energy_forecaster.ipynb && \
-	jupyter nbconvert --to notebook --execute linear_regression.ipynb && \
-	jupyter nbconvert --to notebook --execute prophet.ipynb && \
-	jupyter nbconvert --to notebook --execute sarimax.ipynb && \
+	$(PYRUNNER) naive_energy_forecaster_static.py && \
+	$(PYRUNNER) linear_regression_static.py && \
+	$(PYRUNNER) sarimax_static.py && \
+	$(PYRUNNER) prophet_static.py && \
 	cd .. && \
 	cd CEB && \
-	jupyter nbconvert --to notebook --execute better_lightgbm_results.ipynb && \
-	jupyter nbconvert --to notebook --execute xgboosting.ipynb && \
+	$(PYRUNNER) lightgbm_static.py && \
+	$(PYRUNNER) xgboost_static.py && \
 	cd ../../..
 
 .PHONY: final_modeling_summaries
