@@ -16,7 +16,7 @@ The presumed base folder is `src/data/` in the GitHub folder, unless otherwise s
 
 ## Download metadata and PVDAQ data.
 
-### Option A.  Download all of it, including the stuff we'll rarely use
+### Option A.  Download all of the power data, including rarely-used items.
 
 1. Run `metadata_downloader.py`.  Saves metadata to the GitHub, in `../../data/raw/(subfolders)`.
 2. Run `systems_initializer.py`.  Makes `../../data/core/systems_cleaned.csv`.  (The next section modifies this file)

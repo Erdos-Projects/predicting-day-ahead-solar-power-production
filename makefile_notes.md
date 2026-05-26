@@ -14,14 +14,16 @@
 As above, you must make and activate your Python virtual environment or conda environment on your own; that said, a `make install` command is given for convenience.
 
 ### Part 1: Download, extract, and clean the data
-There is a lot of data, but a lot of it we use only for EDA, or not at all.  If you download all of it, you will be stuck for 6 hours or so; the short version should finish in about an hour.  Hence, we provide two paths to get the data sorted enough to model with:
+There is a lot of data, but a lot of it we use only for EDA, or not at all.  If you download all of it, you will be stuck for 6 hours or so; the short version should finish in about 75 minutes total and is sufficient to run all modeling.  Hence, we provide two paths.
+
+**Option 1.** Use `make extract_and_call_all`, which will call the sequence of operations
 
 ```
-make download_all ; make metadata_compiler_all ; make extract_and_clean_all
+download_power_all ; metadata_compiler_all ; download_weather_all ; extract_and_clean_all.
 ```
-or
+**Option 2.** Use `make extract_and_call_modeling_only`, which will activate the sequence
 ```
-make download_modeling_only ; make metadata_compiler_modeling_only ; make extract_and_clean_modeling_only
+download_power_modeling_only ; metadata_compiler_modeling_only; download_weather_modeling_only ; make extract_and_clean_modeling_only
 ```
 
 ### Part 2: Do the modeling

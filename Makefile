@@ -46,8 +46,8 @@ help: ## No prereqs
 .DEFAULT_GOAL := help
 
 .PHONY: practice_seps
-practice_seps: ##
-    ## debug-only option
+practice_seps: ## No prereqs (except Python venv or conda env)
+    ## Quick debugger for path separator
 	cd src\data
 	cd src\data && $(PYRUNNER) test_hello.py
 	cd src/data
@@ -87,7 +87,7 @@ download_weather_all: download_power_all ##
 	cd ../..
 
 .PHONY: metadata_compiler_all
-metadata_compiler_all: download_power_all ##
+metadata_compiler_all: download_power_all ## 
     ## add to the metadata dataframe
     ## test_durations.py might require some RAM.
 	cd src/data && \
@@ -115,7 +115,6 @@ download_power_modeling_only:  ## No prereqs beyond Python environment.
 	$(PYRUNNER) metadata_downloader.py && \
 	$(PYRUNNER) systems_initializer.py && \
 	$(PYRUNNER) narrow_parquet_downloader.py && \
-	$(PYRUNNER) narrow_nsrdb_irradiance_sampler.py && \
 	cd ../..
 
 .PHONY: download_weather_modeling_only
@@ -123,12 +122,12 @@ download_weather_modeling_only: download_power_modeling_only ##
     ## Download sample weather data (for later power verification)
     ## It requires the NSRDB API key from https://developer.nlr.gov/signup/
 	cd src/data && \
-	$(PYRUNNER) systems_better_sample_year.py && \
+	$(PYRUNNER) narrow_systems_better_sample_year.py && \
 	$(PYRUNNER) narrow_nsrdb_irradiance_sampler.py && \
 	cd ../..
 
 .PHONY: metadata_compiler_modeling_only
-metadata_compiler_modeling_only: download_power_modeling_only ##
+metadata_compiler_modeling_only: download_power_modeling_only ## 
     ## Download extended metadata only for good-timezone systems.
     ## narrow_test_durations will be a RAM hog
 	cd src/data && \
@@ -138,8 +137,7 @@ metadata_compiler_modeling_only: download_power_modeling_only ##
 	cd ../..
 
 .PHONY: extract_and_clean_modeling_only
-extract_and_clean_modeling_only: download_power_modeling_only metadata_compiler_modeling_only \
-download_weather_modeling_only ##
+extract_and_clean_modeling_only: download_power_modeling_only metadata_compiler_modeling_only download_weather_modeling_only ## 
     ## extract and standardize Power Data, convert to energy data
 	cd src/data/pwr && \
 	$(PYRUNNER) narrow_ac_power_parquet_distiller_yearly.py && \
