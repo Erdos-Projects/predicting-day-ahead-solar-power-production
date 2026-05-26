@@ -8,12 +8,13 @@
 # I made my files to be downloaded from a particular folder
 # so I need a trick for file-separators (not for python, but for system cd)
 # Idea from https://skramm.blogspot.com/2013/04/writing-portable-makefiles.html
+# Note: path separators appear to be fixed.
 ifdef ComSpec
-	PATHSEP2:=\\
+	PATHVAR2:=\\
 else
-	PATHSEP2:=/
+	PATHVAR2:=/
 endif
-PATHSEP=$(strip $(PATHSEP2))
+PATHVAR=$(strip $(PATHVAR2))
 
 ifndef ComSpec
     CMDSEP:=;
@@ -21,10 +22,12 @@ else
     CMDSEP:=&
 endif
 
+# note: see practice_seps below for why I choose python over python3 for the python runner
+# It appears to correctly run in the venv, assuming one is activated.
 ifdef py
 	PYRUNNER=py
 else
-	PYRUNNER=python3
+	PYRUNNER=python
 endif
 
 ifdef conda
@@ -42,87 +45,113 @@ help: ## No prereqs
 	@sed -ne '/@sed/!s/## //p' $(MAKEFILE_LIST)
 .DEFAULT_GOAL := help
 
+.PHONY: practice_seps
+practice_seps: ##
+    ## debug-only option
+	cd src\data
+	cd src\data && $(PYRUNNER) test_hello.py
+	cd src/data
+	cd src/data && $(PYRUNNER) test_hello.py
+	cd src\\data 
+	cd src\\data && $(PYRUNNER) test_hello.py
+
 # adapted from https://www.kdnuggets.com/the-case-for-makefiles-in-python-projects-and-how-to-get-started
 .PHONY: install
 install: ## No prereqs (except Python venv or conda env)
     ## Install environment.
 	$(PYINSTALLER)
 
-.PHONY: download_all
-download_all: ## No prereqs (except Python venv or conda env)
-    ## Install all data for all exploration and modeling.
+.PHONY: download_power_all
+download_power_all: ## No prereqs (except Python venv or conda env)
+    ## Install all power data for all exploration and modeling.
     ## This will probably take 6+ hours, so be careful!
-    ## Consider download_modeling_only if time is more limited.
-    ## It also requires the NSRDB API key from https://developer.nlr.gov/signup/
-	cd src$(PATHSEP)data && \
+    ## Consider download_power_modeling_only if time is more limited.
+	cd src/data && \
 	$(PYRUNNER) metadata_downloader.py && \
 	$(PYRUNNER) systems_initializer.py && \
 	$(PYRUNNER) all_parquet_downloader.py && \
 	jupyter nbconvert --to notebook --execute prize_downloader_specific.ipynb && \
 	$(PYRUNNER) nsrdb_irradiance_sampler.py && \
 	$(PYRUNNER) nsrdb_irradiance_full_downloader.py && \
-	cd ..$(PATHSEP)..
+	cd ../..
+
+.PHONY: download_weather_all
+download_weather_all: download_power_all ## 
+    ## Download sample weather data (for later power verification)
+    ## and full weather data (for one set of diagrams in weather folder)
+    ## It requires the NSRDB API key from https://developer.nlr.gov/signup/
+	cd src/data && \
+	$(PYRUNNER) systems_better_sample_year.py && \
+	$(PYRUNNER) nsrdb_irradiance_sampler.py && \
+	$(PYRUNNER) nsrdb_irradiance_full_downloader.py && \
+	cd ../..
 
 .PHONY: metadata_compiler_all
-metadata_compiler_all: download_all 
+metadata_compiler_all: download_power_all ##
     ## add to the metadata dataframe
     ## test_durations.py might require some RAM.
-	cd src$(PATHSEP)data && \
-	$(PYRUNNER) systems_better_sample_year.py && \
+	cd src/data && \
 	$(PYRUNNER) systems_add_modules.py && \
 	$(PYRUNNER) systems_sourced.py && \
 	$(PYRUNNER) test_durations.py && \
-	cd ..$(PATHSEP)..
+	cd ../..
 
 .PHONY: extract_and_clean_all
-extract_and_clean_all: download_all metadata_compiler_all  
+extract_and_clean_all: download_power_all metadata_compiler_all download_weather_all ## 
     ## extract and standardize Power Data, convert to energy data
-    ## takes about 5 GB of RAM
-	cd src$(PATHSEP)data$(PATHSEP)pwr && \
+	cd src/data/pwr && \
 	$(PYRUNNER) ac_power_parquet_distiller_yearly.py && \
-	cd ..$(PATHSEP)..$(PATHSEP).. && \
-	cd notebooks$(PATHSEP)modeling$(PATHSEP)CEB && \
+	cd ../../.. && \
+	cd notebooks/modeling/CEB && \
 	$(PYRUNNER) better_clean_runner.py && \
-	cd ..$(PATHSEP)..$(PATHSEP)..
+	cd ../../..
 
-.PHONY: download_modeling_only
-download_modeling_only:  ## No prereqs beyond Python environment.
+.PHONY: download_power_modeling_only
+download_power_modeling_only:  ## No prereqs beyond Python environment.
     ## Only downloads good-timezone systems.  Takes 30 min.
     ## It also requires the NSRDB API key from https://developer.nlr.gov/signup/
     ## Files meant to be run from containing folders, so lots of cd here.
-	cd src$(PATHSEP)data && \
+	cd src/data && \
 	$(PYRUNNER) metadata_downloader.py && \
 	$(PYRUNNER) systems_initializer.py && \
 	$(PYRUNNER) narrow_parquet_downloader.py && \
 	$(PYRUNNER) narrow_nsrdb_irradiance_sampler.py && \
-	cd ..$(PATHSEP)..
+	cd ../..
+
+.PHONY: download_weather_modeling_only
+download_weather_modeling_only: download_power_modeling_only ## 
+    ## Download sample weather data (for later power verification)
+    ## It requires the NSRDB API key from https://developer.nlr.gov/signup/
+	cd src/data && \
+	$(PYRUNNER) systems_better_sample_year.py && \
+	$(PYRUNNER) narrow_nsrdb_irradiance_sampler.py && \
+	cd ../..
 
 .PHONY: metadata_compiler_modeling_only
-metadata_compiler_modeling_only: download_modeling_only  
+metadata_compiler_modeling_only: download_power_modeling_only ##
     ## Download extended metadata only for good-timezone systems.
     ## narrow_test_durations will be a RAM hog
-	cd src$(PATHSEP)data && \
-	$(PYRUNNER) narrow_systems_better_sample_year.py && \
+	cd src/data && \
 	$(PYRUNNER) systems_add_modules.py && \
 	$(PYRUNNER) systems_sourced.py && \
 	$(PYRUNNER) narrow_test_durations.py && \
-	cd ..$(PATHSEP)..
+	cd ../..
 
 .PHONY: extract_and_clean_modeling_only
-extract_and_clean_modeling_only: download_modeling_only, metadata_compiler_modeling_only
+extract_and_clean_modeling_only: download_power_modeling_only metadata_compiler_modeling_only \
+download_weather_modeling_only ##
     ## extract and standardize Power Data, convert to energy data
-    ## still takes 5 GB of RAM
-	cd src$(PATHSEP)data$(PATHSEP)pwr && \
+	cd src/data/pwr && \
 	$(PYRUNNER) narrow_ac_power_parquet_distiller_yearly.py && \
-	cd ..$(PATHSEP)..$(PATHSEP).. && \
-	cd notebooks$(PATHSEP)modeling$(PATHSEP)CEB && \
+	cd ../../.. && \
+	cd notebooks/modeling/CEB && \
 	$(PYRUNNER) better_clean_runner.py && \
-	cd ..$(PATHSEP)..$(PATHSEP)..
+	cd ../../..
 
 .PHONY: all_modeling_runs
 all_modeling_runs: ## Requires one of extract_and_clean_modeling_only, extract_and_clean_all
     ## Run all modeling notebooks/scripts.
-	cd notebooks$(PATHSEP)modeling$(PATHSEP)RS && \
+	cd notebooks/modeling/RS && \
 	jupyter nbconvert --to notebook --execute naive_energy_forecaster.ipynb && \
 	jupyter nbconvert --to notebook --execute linear_regression.ipynb && \
 	jupyter nbconvert --to notebook --execute prophet.ipynb && \
@@ -131,12 +160,12 @@ all_modeling_runs: ## Requires one of extract_and_clean_modeling_only, extract_a
 	cd CEB && \
 	jupyter nbconvert --to notebook --execute better_lightgbm_results.ipynb && \
 	jupyter nbconvert --to notebook --execute xgboosting.ipynb && \
-	cd ..$(PATHSEP)..$(PATHSEP)..
+	cd ../../..
 
 .PHONY: final_modeling_summaries
-final_modeling_summaries: all_modeling_runs 
+final_modeling_summaries: all_modeling_runs ##
     ## Run summary files.  The pictures in final_results.ipynb may not work.
-	cd notebooks$(PATHSEP)modeling && \
+	cd notebooks/modeling && \
 	jupyter nbconvert --to notebook --execute training_scores_comparison.ipynb && \
 	jupyter nbconvert --to notebook --execute final_results.ipynb && \
-	cd ..$(PATHSEP)..
+	cd ../..

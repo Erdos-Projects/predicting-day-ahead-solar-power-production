@@ -511,7 +511,7 @@ def find_good_date(system_id: int,
     based on satellite irradiance figures (in the Google Drive).'''
     relevant_rows_systems = systems_cleaned[systems_cleaned['system_id'] == system_id]
     ind = relevant_rows_systems.index[0]
-    target_year = int(relevant_rows_systems.loc[ind, 'sample_year'])
+    target_year = int(relevant_rows_systems.at[ind, 'sample_year'])
     if target_year < 1999:
         target_year = 1999
     my_irrad_address = '../../../../data_ds_project/systems/parquet_irrad_samples/'\
