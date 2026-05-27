@@ -73,6 +73,8 @@ Assuming all high-quality days, and padding by zero entries for hours with no da
 
 * Indeed, our gradient-boosting methods were resource-intensive enough that I sometimes only used every `m`th fold, m between 2 and 5, to get effectively 250-fold to 350-fold cross-validation.
 
+* For SARIMAX, we really need continuous data, so we just restricted ourselves to 8-day contiguous chunks of high-quality data, such as they are.
+
 These folds are produced either by a the function `tts_of_data_using_end_days()` in the latest [PreRun](notebooks/modeling/RS/PreRun.py) or by the `k_fold_split_option_a(*args)` function in [notebooks/modeling/CEB/by_dates_Kfold.py](notebooks/modeling/CEB/by_dates_Kfold.py).
 
 ## Results

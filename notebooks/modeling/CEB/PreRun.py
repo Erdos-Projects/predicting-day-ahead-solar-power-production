@@ -1,3 +1,5 @@
+'''Copied from (slightly old) version of the PreRun in ../modeling/RS.
+Kept as-is to preserve exact results.'''
 from time import strftime
 import numpy as np
 import pandas as pd
