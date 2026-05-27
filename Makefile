@@ -146,13 +146,6 @@ extract_and_clean_modeling_only: download_power_modeling_only metadata_compiler_
 	$(PYRUNNER) better_clean_runner.py && \
 	cd ../../..
 
-.PHONY: one_ipynb
-one_ipynb: ## Requires one of extract_and_clean_modeling_only, extract_and_clean_all 
-    ## extract and standardize Power Data, convert to energy data
-	cd notebooks/modeling/RS && \
-	jupyter nbconvert --to notebook --execute "naive energy forecaster.ipynb" && \
-	cd ../../..
-
 .PHONY: all_modeling_runs
 all_modeling_runs: ## Requires one of extract_and_clean_modeling_only, extract_and_clean_all
     ## Run all modeling notebooks/scripts.
@@ -171,6 +164,6 @@ all_modeling_runs: ## Requires one of extract_and_clean_modeling_only, extract_a
 final_modeling_summaries: all_modeling_runs ##
     ## Run summary files.  The pictures in final_results.ipynb may not work.
 	cd notebooks/modeling && \
-	jupyter nbconvert --to notebook --execute training_scores_comparison.ipynb && \
-	jupyter nbconvert --to notebook --execute final_results.ipynb && \
+	$(PYRUNNER) training_scores_comparison_static.py && \
+	$(PYRUNNER) final_results_static.py && \
 	cd ../..

@@ -22,7 +22,7 @@ systems_cleaned = pd.read_csv("../../../data/core/systems_cleaned.csv")
 
 results_folder = Path('/.sarimax_errors')
 if not results_folder.is_dir():
-    results_folder.mk_dir()
+    results_folder.mkdir()
 
 
 def use_sarimax(df_train, df_ho, p=0, d=0, q=0, P=0, D=0, Q=0, s=0):
