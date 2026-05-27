@@ -72,7 +72,7 @@ def read_results_summaries(system_id: int):
     return total_results
 
 
-result_summaries_folder = Path('./summaries/')
+result_summaries_folder = Path('../../results/final/training_summaries/')
 if not result_summaries_folder.is_dir():
     result_summaries_folder.mkdir()
 for system_id in [10, 50, 51]:

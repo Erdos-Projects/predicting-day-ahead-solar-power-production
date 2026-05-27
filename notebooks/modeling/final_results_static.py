@@ -17,7 +17,7 @@ systems_cleaned = pd.read_csv("../../data/core/systems_cleaned.csv")
 relevant_system_pairs = [(10, None), (50, None), (51, None)]
 
 #  results folder config
-results_folder_str = './final_sarimax_errors/'
+results_folder_str = '../../results/final/final_sarimax_errors/'
 results_folder = Path(results_folder_str)
 if not results_folder.is_dir():
     results_folder.mkdir()
