@@ -70,9 +70,8 @@ download_power_all: ## No prereqs (except Python venv or conda env)
 	$(PYRUNNER) metadata_downloader.py && \
 	$(PYRUNNER) systems_initializer.py && \
 	$(PYRUNNER) all_parquet_downloader.py && \
-	jupyter nbconvert --to notebook --execute prize_downloader_specific.ipynb && \
-	$(PYRUNNER) nsrdb_irradiance_sampler.py && \
-	$(PYRUNNER) nsrdb_irradiance_full_downloader.py && \
+	$(PYRUNNER) prize_downloader.py && \
+	$(PYRUNNER) prize_downloader_specific_static.py && \
 	cd ../..
 
 .PHONY: download_weather_all
