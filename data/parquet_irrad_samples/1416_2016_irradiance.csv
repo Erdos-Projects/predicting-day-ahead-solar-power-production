@@ -1,0 +1,1 @@
+{"inputs":{"body":{},"params":{},"query":{"names":"2016","wkt":"POINT(78.63411 35.7793)","interval":"60","attributes":"dhi","utc":"false","leap_day":"true","email":"ch83baker@gmail.com"}},"metadata":{"version":"2.0.0"},"status":400,"errors":["No data available at the provided location","Data processing failure."]}

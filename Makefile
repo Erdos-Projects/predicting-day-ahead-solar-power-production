@@ -39,7 +39,7 @@ endif
 # From https://stackoverflow.com/questions/8889035/how-to-document-a-makefile
 .PHONY: help
 help: ## No prereqs
-    ## yield names of instructions, Windows environment
+    ## yield names of instructions.
     ## Requires sed command as well.
 	@echo "Available commands:"
 	@sed -ne '/@sed/!s/## //p' $(MAKEFILE_LIST)
@@ -79,6 +79,7 @@ download_weather_all: download_power_all ##
     ## Download sample weather data (for later power verification)
     ## and full weather data (for one set of diagrams in weather folder)
     ## It requires the NSRDB API key from https://developer.nlr.gov/signup/
+    ## If that is problematic, try the courtesy copy in the data/parquet_irrad_samples folder
 	cd src/data && \
 	$(PYRUNNER) systems_better_sample_year.py && \
 	$(PYRUNNER) nsrdb_irradiance_sampler.py && \
@@ -109,7 +110,6 @@ extract_and_clean_all: download_power_all metadata_compiler_all download_weather
 download_power_modeling_only:  ## No prereqs beyond Python environment.
     ## Only downloads good-timezone systems.  Takes 30 min.
     ## It also requires the NSRDB API key from https://developer.nlr.gov/signup/
-    ## Files meant to be run from containing folders, so lots of cd here.
 	cd src/data && \
 	$(PYRUNNER) metadata_downloader.py && \
 	$(PYRUNNER) systems_initializer.py && \
@@ -147,7 +147,8 @@ extract_and_clean_modeling_only: download_power_modeling_only metadata_compiler_
 
 .PHONY: all_modeling_runs
 all_modeling_runs: ## Requires one of extract_and_clean_modeling_only, extract_and_clean_all
-    ## Run all modeling notebooks/scripts.
+    ## Run all modeling notebooks/scripts.  Takes about 12 hours to run.
+    ## The gradient-boosting rules will use up all your CPU 
 	cd notebooks/modeling/RS && \
 	$(PYRUNNER) naive_energy_forecaster_static.py && \
 	$(PYRUNNER) linear_regression_static.py && \
@@ -161,7 +162,7 @@ all_modeling_runs: ## Requires one of extract_and_clean_modeling_only, extract_a
 
 .PHONY: final_modeling_summaries
 final_modeling_summaries: all_modeling_runs ## 
-    ## Run summary files.  The pictures in final_results.ipynb may not work.
+    ## Run final-summary files.
 	cd notebooks/modeling && \
 	$(PYRUNNER) training_scores_comparison_static.py && \
 	$(PYRUNNER) final_results_static.py && \

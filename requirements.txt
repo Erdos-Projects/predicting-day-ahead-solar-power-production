@@ -1,6 +1,5 @@
 jupyter
 ipykernel
-nbconvert
 numpy
 pandas
 seaborn
