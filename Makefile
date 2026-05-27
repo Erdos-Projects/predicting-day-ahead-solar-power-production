@@ -161,7 +161,7 @@ all_modeling_runs: ## Requires one of extract_and_clean_modeling_only, extract_a
 	cd ../../..
 
 .PHONY: final_modeling_summaries
-final_modeling_summaries: all_modeling_runs ##
+final_modeling_summaries: all_modeling_runs ## 
     ## Run summary files.  The pictures in final_results.ipynb may not work.
 	cd notebooks/modeling && \
 	$(PYRUNNER) training_scores_comparison_static.py && \

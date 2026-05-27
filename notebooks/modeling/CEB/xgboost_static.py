@@ -7,6 +7,7 @@ from itertools import product
 from by_dates_Kfold import k_fold_split_option_a
 from tqdm import tqdm
 
+results_folder_str = './xgboost_results/'
 results_folder = Path('./xgboost_results/')
 if not results_folder.is_dir():
     results_folder.mkdir()
@@ -97,16 +98,16 @@ def xgb_one_layer_d(system_id: int, read_path: str, met_or_inv, systems_cleaned:
             val_error = PostRun.custom_error(y_pred, y_ho, 1, 2)
             outer_test_results.at[i, col_names[j]] = val_error
     outer_test_results.to_csv(
-        f'./xgboost_results/{system_id}_{met_or_inv}.csv', index=False
+        f'{results_folder_str}{system_id}_{met_or_inv}.csv', index=False
     )
     return outer_test_results
 
 
 params = [(10, None, 2), (50, None, 5), (51, None, 5)]
 for param in params:
-    system_id = params[0]
-    met_or_inv = params[1]
-    num_skips = params[2]
+    system_id = param[0]
+    met_or_inv = param[1]
+    num_skips = param[2]
     xgb_one_layer_d(
         system_id, '../../../../data_ds_project/parquet_cleaned_energy/',
         met_or_inv,
