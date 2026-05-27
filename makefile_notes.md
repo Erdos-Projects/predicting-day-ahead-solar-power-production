@@ -4,7 +4,7 @@
 1. Access to UNIX-like `make` and `sed` commands.  Mac and *nix people should be settled, but Windows users will need to manually install them.  I (Charles) used GNUWin packages [make for Windows](https://gnuwin32.sourceforge.net/packages/make.htm) and [sed for Windows](https://gnuwin32.sourceforge.net/packages/sed.htm).  You may also need to add the GNUWin `/bin` directory to your system path -- see ``System Properties -- Advanced -- Environment Variables -- System Variables -- New``.
 2. Python virtual environment or conda environment, 3.12 or 3.13-based.  It must be activated before running.  (I would need to have users manually include their activation files/links otherwise, and I'd need a `if/elif/else` structure for Windows command line, Windows PowerShell, and Unix commands.)
 3. An NSRDB API key (https://developer.nlr.gov/signup/).  (Used to download a sample of irradiance data to verify that a day *should* be producing full power, to verify that the reported units of power are accurate.)
-4. A folder `data_ds_project` on the same level as the GitHub folder, with `systems` subfolder.  (This might be superfluous.)
+4. No conflict with any pre-existing folder `data_ds_project` on the same level as the GitHub folder.
 
 ## Help
 `make help` is instantiated, following the suggestions in [Stack Overflow Question 889035](https://stackoverflow.com/questions/8889035/how-to-document-a-makefile)  (this is where sed is used).  It can give further guidance. 

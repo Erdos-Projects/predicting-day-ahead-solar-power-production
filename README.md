@@ -38,7 +38,7 @@ We still made a little use of another irradiance dataset, the NSRDB GOES-aggrega
 
 ### Complication -- size of documents
 
-The raw data is too large to fit in the GitHub.  For example, we need almost 10 GB of data from the [2023 Solar Data Prize dataset](https://data.openei.org/s3_viewer?bucket=oedi-data-lake&prefix=pvdaq%2F2023-solar-data-prize%2F) and 17.1 GB from the [PVDAQ Public Data Lake - Parquet](https://data.openei.org/s3_viewer?bucket=oedi-data-lake&prefix=pvdaq%2Fparquet%2F) collection.  Hence, although most of the metadata is able to be stored in the GitHub folder, the bulk of the data is stored in the `data_ds_project` folder, a local-storage folder at the same level as the GitHub folder.
+The raw data is too large to fit in the GitHub.  For example, we downloaded almost 10 GB of data from the [2023 Solar Data Prize dataset](https://data.openei.org/s3_viewer?bucket=oedi-data-lake&prefix=pvdaq%2F2023-solar-data-prize%2F) and 17.1 GB from the [PVDAQ Public Data Lake - Parquet](https://data.openei.org/s3_viewer?bucket=oedi-data-lake&prefix=pvdaq%2Fparquet%2F) collection (and even after trimming, we still need over 2 GB of data).  Hence, although most of the metadata is able to be stored in the GitHub folder, the bulk of the data is stored in the `data_ds_project` folder, a local-storage folder at the same level as the GitHub folder.
 
 ### Complication -- lots of preprocessing
 
@@ -73,7 +73,7 @@ Assuming all high-quality days, and padding by zero entries for hours with no da
 
 * Indeed, our gradient-boosting methods were resource-intensive enough that I sometimes only used every `m`th fold, m between 2 and 5, to get effectively 250-fold to 350-fold cross-validation.
 
-These folds are produced either by a `PreRun` function  or by the `k_fold_split_option_a(*args)` function in [notebooks/modeling/CEB/by_dates_Kfold.py](notebooks/modeling/CEB/by_dates_Kfold.py).
+These folds are produced either by a the function `tts_of_data_using_end_days()` in the latest [PreRun](notebooks/modeling/RS/PreRun.py) or by the `k_fold_split_option_a(*args)` function in [notebooks/modeling/CEB/by_dates_Kfold.py](notebooks/modeling/CEB/by_dates_Kfold.py).
 
 ## Results
 
